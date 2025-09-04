@@ -3,14 +3,9 @@
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import { Badge } from "@/components/ui/badge"
 import { BookForm } from "@/components/book-form"
-import { BookTable } from "@/components/book-table"
-import { StockAlerts } from "@/components/stock-alerts"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-import { Package, Plus, Search, AlertTriangle, ArrowLeft } from "lucide-react"
-import Link from "next/link"
+import { Package, Plus, Search, AlertTriangle, BookOpen, ShoppingCart, BarChart3, Edit, Trash2 } from "lucide-react"
 
 interface Book {
   id: number
@@ -125,118 +120,156 @@ export default function InventoryPage() {
     return books.reduce((total, book) => total + book.precio * book.stock, 0)
   }
 
+  const stats = [
+    {
+      title: "Total Libros",
+      value: books.length.toString(),
+      icon: Package,
+      color: "text-blue-600",
+    },
+    {
+      title: "Stock Bajo",
+      value: lowStockBooks.length.toString(),
+      icon: AlertTriangle,
+      color: "text-yellow-600",
+    },
+    {
+      title: "Total Unidades",
+      value: books.reduce((sum, book) => sum + book.stock, 0).toString(),
+      icon: Package,
+      color: "text-green-600",
+    },
+    {
+      title: "Valor Total",
+      value: `$${getTotalValue().toFixed(2)}`,
+      icon: Package,
+      color: "text-purple-600",
+    },
+  ]
+
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="bg-card border-b border-border">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
-            <div className="flex items-center gap-3">
-              <Link href="/">
-                <Button variant="ghost" size="sm">
-                  <ArrowLeft className="h-4 w-4 mr-2" />
-                  Volver al POS
-                </Button>
-              </Link>
-              <Package className="h-8 w-8 text-primary" />
-              <h1 className="text-xl font-semibold text-card-foreground">Gestión de Inventario</h1>
-            </div>
-
-            <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-              <DialogTrigger asChild>
-                <Button>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Agregar Libro
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-2xl">
-                <DialogHeader>
-                  <DialogTitle>Agregar Nuevo Libro</DialogTitle>
-                </DialogHeader>
-                <BookForm onSubmit={handleAddBook} onCancel={() => setIsAddDialogOpen(false)} />
-              </DialogContent>
-            </Dialog>
-          </div>
-        </div>
-      </header>
-
+    <div className="flex h-screen bg-slate-50 font-sans">
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="space-y-6">
-          {/* Stats Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <Card className="p-4">
-              <div className="flex items-center gap-3">
-                <Package className="h-8 w-8 text-primary" />
-                <div>
-                  <p className="text-sm text-muted-foreground">Total Libros</p>
-                  <p className="text-2xl font-bold text-card-foreground">{books.length}</p>
-                </div>
-              </div>
-            </Card>
-
-            <Card className="p-4">
-              <div className="flex items-center gap-3">
-                <AlertTriangle className="h-8 w-8 text-accent" />
-                <div>
-                  <p className="text-sm text-muted-foreground">Stock Bajo</p>
-                  <p className="text-2xl font-bold text-card-foreground">{lowStockBooks.length}</p>
-                </div>
-              </div>
-            </Card>
-
-            <Card className="p-4">
-              <div className="flex items-center gap-3">
-                <Package className="h-8 w-8 text-secondary" />
-                <div>
-                  <p className="text-sm text-muted-foreground">Total Unidades</p>
-                  <p className="text-2xl font-bold text-card-foreground">
-                    {books.reduce((sum, book) => sum + book.stock, 0)}
-                  </p>
-                </div>
-              </div>
-            </Card>
-
-            <Card className="p-4">
-              <div className="flex items-center gap-3">
-                <Package className="h-8 w-8 text-primary" />
-                <div>
-                  <p className="text-sm text-muted-foreground">Valor Total</p>
-                  <p className="text-2xl font-bold text-card-foreground">${getTotalValue().toFixed(2)}</p>
-                </div>
-              </div>
-            </Card>
+      <main className="flex-1 p-8 overflow-y-auto">
+        <header className="flex justify-between items-center mb-8">
+          <div>
+            <h1 className="text-3xl font-bold text-slate-800">Gestión de Inventario</h1>
+            <p className="text-slate-500 mt-1">Administra, agrega y edita todos los libros de tu tienda.</p>
           </div>
+          <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+            <DialogTrigger asChild>
+              <Button>
+                <Plus className="h-5 w-5 mr-2" />
+                Agregar Libro
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-2xl">
+              <DialogHeader>
+                <DialogTitle>Agregar Nuevo Libro</DialogTitle>
+              </DialogHeader>
+              <BookForm onSubmit={handleAddBook} onCancel={() => setIsAddDialogOpen(false)} />
+            </DialogContent>
+          </Dialog>
+        </header>
 
-          {/* Stock Alerts */}
-          {lowStockBooks.length > 0 && <StockAlerts books={lowStockBooks} />}
-
-          {/* Search and Filters */}
-          <Card className="p-6">
-            <div className="flex items-center gap-4 mb-6">
-              <div className="flex-1">
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Buscar por título, autor o ISBN..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-10"
-                  />
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          {stats.map((stat, index) => (
+            <Card key={index} className="p-5">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-slate-500">{stat.title}</p>
+                  <p className="text-3xl font-bold text-slate-800 mt-1">{stat.value}</p>
+                </div>
+                <div className={`p-3 rounded-full bg-slate-100 ${stat.color}`}>
+                  <stat.icon className="h-6 w-6" />
                 </div>
               </div>
-              <Badge variant="secondary">{filteredBooks.length} resultados</Badge>
-            </div>
-
-            {/* Books Table */}
-            <BookTable
-              books={filteredBooks}
-              onEdit={setEditingBook}
-              onDelete={handleDeleteBook}
-              isLoading={isLoading}
-            />
-          </Card>
+            </Card>
+          ))}
         </div>
+
+        <Card className="overflow-hidden">
+          <div className="p-5 flex justify-between items-center border-b border-slate-200">
+            <div>
+              <h2 className="text-lg font-semibold text-slate-800">Libros en Inventario</h2>
+              <p className="text-sm text-slate-500 mt-1">{filteredBooks.length} resultados encontrados</p>
+            </div>
+            <div className="relative w-full max-w-sm">
+              <input
+                type="text"
+                placeholder="Buscar por título, autor o ISBN..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400" />
+            </div>
+          </div>
+          <table className="w-full text-left">
+            <thead className="bg-slate-50">
+              <tr>
+                <th className="px-6 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">Título</th>
+                <th className="px-6 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">Autor</th>
+                <th className="px-6 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">ISBN</th>
+                <th className="px-6 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">Precio</th>
+                <th className="px-6 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">Stock</th>
+                <th className="px-6 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider text-right">
+                  Acciones
+                </th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-200">
+              {isLoading ? (
+                <tr>
+                  <td colSpan={6} className="px-6 py-8 text-center text-slate-500">
+                    Cargando libros...
+                  </td>
+                </tr>
+              ) : filteredBooks.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="px-6 py-8 text-center text-slate-500">
+                    No se encontraron libros
+                  </td>
+                </tr>
+              ) : (
+                filteredBooks.map((book) => (
+                  <tr key={book.id} className="hover:bg-slate-50 transition-colors">
+                    <td className="px-6 py-4 whitespace-nowrap font-medium text-slate-800">{book.titulo}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-slate-600">{book.autor}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-slate-500">{book.isbn}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-slate-600">${book.precio.toFixed(2)}</td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span
+                        className={`px-2.5 py-1 text-xs font-medium rounded-full ${
+                          book.stock < 5
+                            ? "bg-yellow-100 text-yellow-800"
+                            : book.stock < 10
+                              ? "bg-blue-100 text-blue-800"
+                              : "bg-green-100 text-green-800"
+                        }`}
+                      >
+                        {book.stock} unidades
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-right space-x-2">
+                      <Button variant="ghost" size="sm" className="p-2 h-auto" onClick={() => setEditingBook(book)}>
+                        <Edit className="h-4 w-4 text-slate-500" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="p-2 h-auto"
+                        onClick={() => handleDeleteBook(book.id)}
+                      >
+                        <Trash2 className="h-4 w-4 text-slate-500 hover:text-red-600" />
+                      </Button>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </Card>
       </main>
 
       {/* Edit Dialog */}

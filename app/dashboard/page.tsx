@@ -32,6 +32,8 @@ interface Book {
   titulo: string
   autor: string
   stock: number
+  isbn: string
+  precio: number
 }
 
 export default function DashboardPage() {

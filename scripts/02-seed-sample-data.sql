@@ -1,7 +1,7 @@
 -- Adding sample data for testing the bookstore system
 -- Insert sample books
 INSERT INTO books (isbn, titulo, autor, precio, stock) VALUES
-('9780143127741', 'Cien años de soledad', 'Gabriel García Márquez', 25.99, 15),
+('9780525564891', 'Cien años de soledad', 'Gabriel García Márquez', 25.99, 15),
 ('9780525563983', 'El amor en los tiempos del cólera', 'Gabriel García Márquez', 22.50, 8),
 ('9780307474728', 'La casa de los espíritus', 'Isabel Allende', 24.99, 12),
 ('9780525432817', 'Rayuela', 'Julio Cortázar', 28.75, 6),
@@ -10,7 +10,8 @@ INSERT INTO books (isbn, titulo, autor, precio, stock) VALUES
 ('9780307475466', 'La sombra del viento', 'Carlos Ruiz Zafón', 26.99, 14),
 ('9780525432824', 'Ficciones', 'Jorge Luis Borges', 23.99, 9),
 ('9780307389749', 'El túnel', 'Ernesto Sabato', 19.99, 11),
-('9780525563990', 'Mafalda', 'Quino', 16.99, 25);
+('9780525563990', 'Mafalda', 'Quino', 16.99, 25),
+('9780525564898', 'Juanito', 'Quino', 16.99, 25);
 
 -- Insert sample sales
 INSERT INTO sales (monto_total) VALUES
