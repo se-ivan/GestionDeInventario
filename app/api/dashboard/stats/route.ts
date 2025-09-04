@@ -1,20 +1,16 @@
 import { NextResponse } from "next/server"
 
 // Mock data - In production, replace with actual database queries
-const books = [
-  { id: 1, stock: 15 },
-  { id: 2, stock: 8 },
-  { id: 3, stock: 12 },
-  { id: 4, stock: 6 },
-  { id: 5, stock: 20 },
-  { id: 6, stock: 10 },
-  { id: 7, stock: 14 },
-  { id: 8, stock: 9 },
-  { id: 9, stock: 11 },
-  { id: 10, stock: 25 },
-  { id: 11, stock: 3 },
-  { id: 12, stock: 2 },
-]
+const books: Array<{
+  id: number
+  isbn: string
+  titulo: string
+  autor: string
+  precio: number
+  stock: number
+  created_at: string
+  updated_at: string
+}> = []
 
 const sales = [
   { fecha: new Date().toISOString(), monto_total: 48.49 },

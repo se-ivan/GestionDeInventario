@@ -1,54 +1,16 @@
 import { type NextRequest, NextResponse } from "next/server"
 
 // Mock databases - In production, replace with actual database connections
-const books = [
-  {
-    id: 1,
-    isbn: "9780143127741",
-    titulo: "Cien años de soledad",
-    autor: "Gabriel García Márquez",
-    precio: 25.99,
-    stock: 15,
-  },
-  {
-    id: 2,
-    isbn: "9780525563983",
-    titulo: "El amor en los tiempos del cólera",
-    autor: "Gabriel García Márquez",
-    precio: 22.5,
-    stock: 8,
-  },
-  {
-    id: 3,
-    isbn: "9780307474728",
-    titulo: "La casa de los espíritus",
-    autor: "Isabel Allende",
-    precio: 24.99,
-    stock: 12,
-  },
-  { id: 4, isbn: "9780525432817", titulo: "Rayuela", autor: "Julio Cortázar", precio: 28.75, stock: 6 },
-  { id: 5, isbn: "9780307389732", titulo: "Pedro Páramo", autor: "Juan Rulfo", precio: 18.99, stock: 20 },
-  {
-    id: 6,
-    isbn: "9780525564447",
-    titulo: "Como agua para chocolate",
-    autor: "Laura Esquivel",
-    precio: 21.5,
-    stock: 10,
-  },
-  {
-    id: 7,
-    isbn: "9780307475466",
-    titulo: "La sombra del viento",
-    autor: "Carlos Ruiz Zafón",
-    precio: 26.99,
-    stock: 14,
-  },
-  { id: 8, isbn: "9780525432824", titulo: "Ficciones", autor: "Jorge Luis Borges", precio: 23.99, stock: 9 },
-  { id: 9, isbn: "9780307389749", titulo: "El túnel", autor: "Ernesto Sabato", precio: 19.99, stock: 11 },
-  { id: 10, isbn: "9780525563990", titulo: "Mafalda", autor: "Quino", precio: 16.99, stock: 25 },
-]
-
+const books: Array<{
+  id: number
+  isbn: string
+  titulo: string
+  autor: string
+  precio: number
+  stock: number
+  created_at: string
+  updated_at: string
+}> = []
 const sales: Array<{
   id: number
   fecha: string
