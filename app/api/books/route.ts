@@ -1,60 +1,38 @@
-import { type NextRequest, NextResponse } from "next/server"
+import { NextResponse } from 'next/server';
+import prisma from '@/lib/prisma';
 
-// Temporary in-memory books array
-const books: Array<{
-  id: number
-  isbn: string
-  titulo: string
-  autor: string
-  precio: number
-  stock: number
-  created_at: string
-  updated_at: string
-}> = []
 
-// GET /api/books - Get all books
+
+// Función para manejar peticiones GET (Leer todos los libros)
 export async function GET() {
   try {
-    return NextResponse.json(books)
+    const books = await prisma.book.findMany();
+    return NextResponse.json(books);
   } catch (error) {
-    console.error("Error fetching books:", error)
-    return NextResponse.json({ error: "Failed to fetch books" }, { status: 500 })
+    console.error("Error al obtener los libros:", error);
+    return NextResponse.json({ message: 'Error al obtener los libros' }, { status: 500 });
   }
 }
 
-// POST /api/books - Create new book
-export async function POST(request: NextRequest) {
+// Función para manejar peticiones POST (Crear un nuevo libro)
+export  async function POST(request: Request) {
   try {
-    const body = await request.json()
-    const { isbn, titulo, autor, precio, stock } = body
+    const data = await request.json();
+    // Aquí puedes agregar validaciones de los datos recibidos
+    
+    const newBook = await prisma.book.create({
+      data: {
+        titulo: data.titulo,
+        autor: data.autor,
+        isbn: data.isbn,
+        precio: data.precio,
+        stock: data.stock,
+      }
+    });
 
-    // Validate required fields
-    if (!isbn || !titulo || !autor || precio === undefined || stock === undefined) {
-      return NextResponse.json({ error: "Missing required fields" }, { status: 400 })
-    }
-
-    // Check if ISBN already exists
-    const existingBook = books.find((book) => book.isbn === isbn)
-    if (existingBook) {
-      return NextResponse.json({ error: "Book with this ISBN already exists" }, { status: 409 })
-    }
-
-    // Create new book
-    const newBook = {
-      id: Math.max(...books.map((b) => b.id), 0) + 1,
-      isbn,
-      titulo,
-      autor,
-      precio: Number(precio),
-      stock: Number(stock),
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    }
-
-    books.push(newBook)
-    return NextResponse.json(newBook, { status: 201 })
+    return NextResponse.json(newBook, { status: 201 }); // 201 significa "Creado"
   } catch (error) {
-    console.error("Error creating book:", error)
-    return NextResponse.json({ error: "Failed to create book" }, { status: 500 })
+    console.error("Error al crear el libro:", error);
+    return NextResponse.json({ message: 'Error al crear el libro' }, { status: 500 });
   }
 }

@@ -23,7 +23,7 @@ export function StockAlerts({ books }: StockAlertsProps) {
   return (
     <Card className="p-4 border-accent/20 bg-accent/5">
       <div className="flex items-center gap-3 mb-4">
-        <AlertTriangle className="h-5 w-5 text-accent" />
+        <AlertTriangle className="h-5 w-5 text-destructive" />
         <h3 className="font-semibold text-card-foreground">Alertas de Stock Bajo</h3>
         <Badge variant="secondary">{books.length} libros</Badge>
       </div>

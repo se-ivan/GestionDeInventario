@@ -237,16 +237,18 @@ export default function InventoryPage() {
                     <td className="px-6 py-4 whitespace-nowrap font-medium text-slate-800">{book.titulo}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-slate-600">{book.autor}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-slate-500">{book.isbn}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-slate-600">${book.precio.toFixed(2)}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-slate-600">{new Intl.NumberFormat('es-MX', {
+                      style: 'currency',
+                      currency: 'MXN',
+                    }).format(book.precio)}</td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span
-                        className={`px-2.5 py-1 text-xs font-medium rounded-full ${
-                          book.stock < 5
+                        className={`px-2.5 py-1 text-xs font-medium rounded-full ${book.stock < 5
                             ? "bg-yellow-100 text-yellow-800"
                             : book.stock < 10
                               ? "bg-blue-100 text-blue-800"
                               : "bg-green-100 text-green-800"
-                        }`}
+                          }`}
                       >
                         {book.stock} unidades
                       </span>

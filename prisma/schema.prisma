@@ -1,0 +1,66 @@
+// 1. Configuración de la conexión a la base de datos
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// 2. Generador del Cliente de Prisma
+generator client {
+  provider = "prisma-client-js"
+  previewFeatures = ["fullTextSearch"]
+}
+
+// 3. Modelos de Datos
+
+model Book {
+  id               Int          @id @default(autoincrement())
+  isbn             String?      @unique
+  titulo           String
+  autor            String
+  precio           Decimal      @db.Decimal(10, 2)
+  stock            Int          @default(0)
+  editorial        String?
+  anioPublicacion  Int?         @map("anio_publicacion")
+  genero           String?
+  createdAt        DateTime     @default(now()) @map("created_at")
+  updatedAt        DateTime     @updatedAt @map("updated_at")
+
+  // Relación: Un libro puede estar en muchos detalles de venta
+  saleDetails      SaleDetail[]
+
+  // Índices para mejorar el rendimiento de las búsquedas
+  @@index([titulo])
+  @@map("books")
+}
+
+model Sale {
+  id         Int        @id @default(autoincrement())
+  fecha      DateTime   @default(now())
+  montoTotal Decimal    @map("monto_total") @db.Decimal(10, 2)
+  createdAt  DateTime   @default(now()) @map("created_at")
+
+  // Relación: Una venta tiene muchos detalles
+  details    SaleDetail[]
+
+  // Índice para búsquedas por fecha
+  @@index([fecha])
+  @@map("sales")
+}
+
+model SaleDetail {
+  id              Int      @id @default(autoincrement())
+  cantidadVendida Int      @map("cantidad_vendida")
+  precioUnitario  Decimal  @map("precio_unitario") @db.Decimal(10, 2)
+  subtotal        Decimal  @db.Decimal(10, 2)
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  // Campos para la relación con Sale
+  saleId          Int      @map("sale_id")
+  sale            Sale     @relation(fields: [saleId], references: [id], onDelete: Cascade)
+
+  // Campos para la relación con Book
+  bookId          Int      @map("book_id")
+  book            Book     @relation(fields: [bookId], references: [id], onDelete: Cascade)
+
+  @@map("sale_details")
+}

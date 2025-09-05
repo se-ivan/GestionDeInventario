@@ -142,7 +142,10 @@ export default function PointOfSale() {
                       <p className="text-sm text-slate-400 mt-2">Stock: {book.stock}</p>
                     </div>
                     <div className="p-4 border-t border-slate-200 flex items-center justify-between">
-                      <p className="font-bold text-lg text-blue-600">${book.precio.toFixed(2)}</p>
+                      <p className="font-bold text-lg text-blue-600">{new Intl.NumberFormat('es-MX', {
+                      style: 'currency',
+                      currency: 'MXN',
+                    }).format(book.precio)}</p>
                       <Button onClick={() => addToCart(book)} size="sm" disabled={book.stock === 0}>
                         Añadir
                       </Button>

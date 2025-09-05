@@ -1,20 +1,14 @@
 import { NextResponse } from "next/server"
-
-const books: Array<{
-  id: number
-  isbn: string
-  titulo: string
-  autor: string
-  precio: number
-  stock: number
-  created_at: string
-  updated_at: string
-}> = []
+import prisma from "@/lib/prisma"
 
 // GET /api/books/low-stock - Get books with low stock (≤5)
 export async function GET() {
   try {
-    const lowStockBooks = books.filter((book) => book.stock <= 5)
+    const lowStockBooks = await prisma.book.findMany({
+      where: {
+        stock: { lte: 2}
+      }
+    })
     return NextResponse.json(lowStockBooks)
   } catch (error) {
     console.error("Error fetching low stock books:", error)

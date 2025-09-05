@@ -1,29 +1,18 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { useState } from "react"
-
-const books: Array<{
-  id: number
-  isbn: string
-  titulo: string
-  autor: string
-  precio: number
-  stock: number
-  created_at: string
-  updated_at: string
-}> = []
-
+import prisma from "@/lib/prisma"
 
 const fetchBooks = async () => {
-    try {
-      const response = await fetch("/api/books")
-      if (response.ok) {
-        const booksData = await response.json()
-        books.push(...booksData)
-      }
-    } catch (error) {
-      console.error("Error fetching books:", error)
-    }  
+  try {
+    const response = await fetch("/api/books")
+    if (response.ok) {
+      const booksData = await response.json()
+      prisma.book.createMany({ data: booksData })
+    }
+  } catch (error) {
+    console.error("Error fetching books:", error)
   }
+}
 
 // GET /api/books/search?q=query - Search books
 export async function GET(request: NextRequest) {
@@ -36,13 +25,17 @@ export async function GET(request: NextRequest) {
     }
 
     const searchTerm = query.toLowerCase()
-    const filteredBooks = books.filter(
-      (book) =>
-        book.titulo.toLowerCase().includes(searchTerm) ||
-        book.autor.toLowerCase().includes(searchTerm) ||
-        book.isbn.includes(searchTerm),
-    )
-
+    const filteredBooks = await prisma.book.findMany({
+      where: {
+        OR: [
+          { titulo: { contains: searchTerm, mode: 'insensitive' } }, 
+          { autor: { contains: searchTerm, mode: 'insensitive' } },  
+          { isbn: { contains: searchTerm, mode: 'insensitive' } },  
+        ],
+      },
+    });
+    console.log(searchTerm)
+    console.log(filteredBooks)
     return NextResponse.json(filteredBooks)
   } catch (error) {
     console.error("Error searching books:", error)

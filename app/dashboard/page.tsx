@@ -41,7 +41,7 @@ export default function DashboardPage() {
     todaySales: 0,
     todayRevenue: 0,
     totalBooks: 0,
-    lowStockCount: 0,
+    lowStockCount: 1,
     weeklyRevenue: 0,
     monthlyRevenue: 0,
     totalCustomers: 0,
