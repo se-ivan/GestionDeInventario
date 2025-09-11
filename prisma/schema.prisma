@@ -6,31 +6,71 @@ datasource db {
 
 // 2. Generador del Cliente de Prisma
 generator client {
-  provider = "prisma-client-js"
-  previewFeatures = ["fullTextSearch"]
+  provider        = "prisma-client-js"
+  previewFeatures = ["fullTextSearchPostgres"]
 }
 
 // 3. Modelos de Datos
 
+model User {
+  id         Int      @id @default(autoincrement())
+  nombre     String
+  email      String   @unique
+  password   String
+  rol        String   // Por ejemplo: 'ADMIN' o 'VENDEDOR'
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  // --- Relación con Sucursal ---
+  sucursalId Int?     @map("sucursal_id")
+  sucursal   Sucursal? @relation(fields: [sucursalId], references: [id])
+
+  @@map("users")
+}
+
 model Book {
-  id               Int          @id @default(autoincrement())
-  isbn             String?      @unique
-  titulo           String
-  autor            String
-  precio           Decimal      @db.Decimal(10, 2)
-  stock            Int          @default(0)
-  editorial        String?
-  anioPublicacion  Int?         @map("anio_publicacion")
-  genero           String?
-  createdAt        DateTime     @default(now()) @map("created_at")
-  updatedAt        DateTime     @updatedAt @map("updated_at")
+  id              Int        @id @default(autoincrement())
+  isbn            String?    @unique
+  titulo          String
+  autor           String
+  precio          Decimal    @db.Decimal(10, 2)
+  editorial       String?
+  coleccion       String?
+  anioPublicacion Int?       @map("anio_publicacion")
+  genero          String?
+  createdAt       DateTime   @default(now()) @map("created_at")
+  updatedAt       DateTime   @updatedAt @map("updated_at")
+  stock           Int        @default(0)
+  // Relaciones
+  inventario      Inventario[]
+  saleDetails     SaleDetail[]
 
-  // Relación: Un libro puede estar en muchos detalles de venta
-  saleDetails      SaleDetail[]
-
-  // Índices para mejorar el rendimiento de las búsquedas
   @@index([titulo])
   @@map("books")
+}
+
+model Sucursal {
+  id         Int        @id @default(autoincrement())
+  nombre     String     @unique
+  direccion  String?
+  createdAt  DateTime   @default(now()) @map("created_at")
+  updatedAt  DateTime   @updatedAt @map("updated_at")
+
+  // Relación
+  inventario Inventario[]
+  users      User[]
+  @@map("sucursales")
+  
+}
+
+model Inventario {
+  bookId     Int      @map("book_id")
+  book       Book     @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  sucursalId Int      @map("sucursal_id")
+  sucursal   Sucursal @relation(fields: [sucursalId], references: [id], onDelete: Cascade)
+  stock      Int      @default(0)
+
+  @@id([bookId, sucursalId])
+  @@map("inventario")
 }
 
 model Sale {
@@ -39,10 +79,9 @@ model Sale {
   montoTotal Decimal    @map("monto_total") @db.Decimal(10, 2)
   createdAt  DateTime   @default(now()) @map("created_at")
 
-  // Relación: Una venta tiene muchos detalles
+  // Relación
   details    SaleDetail[]
 
-  // Índice para búsquedas por fecha
   @@index([fecha])
   @@map("sales")
 }
@@ -54,11 +93,9 @@ model SaleDetail {
   subtotal        Decimal  @db.Decimal(10, 2)
   createdAt       DateTime @default(now()) @map("created_at")
 
-  // Campos para la relación con Sale
+  // Relaciones
   saleId          Int      @map("sale_id")
   sale            Sale     @relation(fields: [saleId], references: [id], onDelete: Cascade)
-
-  // Campos para la relación con Book
   bookId          Int      @map("book_id")
   book            Book     @relation(fields: [bookId], references: [id], onDelete: Cascade)
 

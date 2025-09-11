@@ -1,12 +1,19 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 
-
-
-// Función para manejar peticiones GET (Leer todos los libros)
+// La función GET no necesita cambios.
 export async function GET() {
   try {
-    const books = await prisma.book.findMany();
+    const books = await prisma.book.findMany({
+      // Opcional: Incluir el inventario para ver el stock por sucursal.
+      include: {
+        inventario: {
+          include: {
+            sucursal: true,
+          },
+        },
+      },
+    });
     return NextResponse.json(books);
   } catch (error) {
     console.error("Error al obtener los libros:", error);
@@ -14,25 +21,45 @@ export async function GET() {
   }
 }
 
-// Función para manejar peticiones POST (Crear un nuevo libro)
-export  async function POST(request: Request) {
+
+export async function POST(request: Request) {
   try {
-    const data = await request.json();
-    // Aquí puedes agregar validaciones de los datos recibidos
-    
+    const body = await request.json();
+
     const newBook = await prisma.book.create({
       data: {
-        titulo: data.titulo,
-        autor: data.autor,
-        isbn: data.isbn,
-        precio: data.precio,
-        stock: data.stock,
+        titulo: body.titulo,
+        autor: body.autor,
+        precio: body.precio,
+        isbn: body.isbn,
+        editorial: body.editorial,
+        coleccion: body.coleccion,
+        anioPublicacion: body.anioPublicacion,
+        genero: body.genero,
+        inventario: {
+          create: {
+            sucursalId: body.sucursalId,
+            stock: body.stock,
+          },
+        },
+      },
+      include: {
+        // Incluimos el inventario para devolver la entrada completa
+        inventario: {
+          include: {
+            sucursal: true
+          }
+        }
       }
     });
 
-    return NextResponse.json(newBook, { status: 201 }); // 201 significa "Creado"
+    return NextResponse.json(newBook);
   } catch (error) {
-    console.error("Error al crear el libro:", error);
+    console.error("Error al crear el libro y su inventario:", error);
+    // Devuelve un mensaje de error más específico si es posible
+    if (error instanceof Error && error.message.includes('sucursal')) {
+         return NextResponse.json({ message: 'La sucursal especificada no existe.' }, { status: 404 });
+    }
     return NextResponse.json({ message: 'Error al crear el libro' }, { status: 500 });
   }
 }

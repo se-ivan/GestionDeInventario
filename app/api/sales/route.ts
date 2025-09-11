@@ -1,138 +1,91 @@
-import { type NextRequest, NextResponse } from "next/server"
+import { NextResponse } from 'next/server';
+import prisma from '@/lib/prisma';
 
-// Mock databases - In production, replace with actual database connections
-const books: Array<{
-  id: number
-  isbn: string
-  titulo: string
-  autor: string
-  precio: number
-  stock: number
-  created_at: string
-  updated_at: string
-}> = []
-const sales: Array<{
-  id: number
-  fecha: string
-  monto_total: number
-  items_count: number
-}> = []
-
-const saleDetails: Array<{
-  id: number
-  sale_id: number
-  book_id: number
-  cantidad_vendida: number
-  precio_unitario: number
-  subtotal: number
-}> = []
-
-// Simulate WhatsApp notification
-async function sendWhatsAppNotification(saleData: any) {
+// La función GET no necesita cambios.
+export async function GET() {
   try {
-    // In production, integrate with WhatsApp Business API
-    console.log("📱 WhatsApp Notification:", {
-      message: `Nueva venta procesada: $${saleData.monto_total.toFixed(2)}`,
-      items: saleData.items_count,
-      timestamp: saleData.fecha,
-    })
-
-    // Simulate API call delay
-    await new Promise((resolve) => setTimeout(resolve, 500))
-    return { success: true }
+    const books = await prisma.book.findMany({
+      // Opcional: Incluir el inventario para ver el stock por sucursal.
+      include: {
+        inventario: {
+          include: {
+            sucursal: true,
+          },
+        },
+      },
+    });
+    return NextResponse.json(books);
   } catch (error) {
-    console.error("Error sending WhatsApp notification:", error)
-    return { success: false, error }
+    console.error("Error al obtener los libros:", error);
+    return NextResponse.json({ message: 'Error al obtener los libros' }, { status: 500 });
   }
 }
 
-// POST /api/sales - Process new sale
-export async function POST(request: NextRequest) {
+// === FUNCIÓN POST MODIFICADA ===
+// Ahora maneja la creación del libro y su inventario inicial en una transacción.
+export async function POST(request: Request) {
   try {
-    const body = await request.json()
-    const { items } = body
+    const data = await request.json();
+    const {
+      titulo,
+      autor,
+      isbn,
+      precio,
+      editorial,
+      coleccion,
+      anioPublicacion,
+      genero,
+      stock, // Este es el stock inicial
+      sucursalId, // Esperamos el ID de la sucursal desde el formulario
+    } = data;
 
-    if (!items || !Array.isArray(items) || items.length === 0) {
-      return NextResponse.json({ error: "Items are required" }, { status: 400 })
+    // Validación de datos básicos
+    if (!titulo || !autor || !precio || !stock || !sucursalId) {
+      return NextResponse.json(
+        { message: 'Faltan campos requeridos: título, autor, precio, stock y sucursal son obligatorios.' },
+        { status: 400 }
+      );
     }
+    
+    // Usamos una transacción para asegurar que ambas operaciones (crear libro y crear inventario)
+    // se completen exitosamente. Si una falla, la otra se revierte.
+    const nuevoLibroConInventario = await prisma.$transaction(async (tx) => {
+      // 1. Crear el libro.
+      // El campo 'stock' en el modelo Book ahora puede funcionar como un conteo total,
+      // que se inicializa con el primer lote de inventario.
+      const newBook = await tx.book.create({
+        data: {
+          titulo,
+          autor,
+          isbn,
+          precio,
+          editorial,
+          coleccion,
+          anioPublicacion,
+          genero,
+          stock, // Stock total inicial
+        },
+      });
 
-    // Validate stock availability
-    for (const item of items) {
-      const book = books.find((b) => b.id === item.book_id)
-      if (!book) {
-        return NextResponse.json({ error: `Book with ID ${item.book_id} not found` }, { status: 404 })
-      }
-      if (book.stock < item.quantity) {
-        return NextResponse.json(
-          {
-            error: `Insufficient stock for "${book.titulo}". Available: ${book.stock}, Requested: ${item.quantity}`,
-          },
-          { status: 400 },
-        )
-      }
-    }
+      // 2. Crear la entrada de inventario para ese libro en la sucursal especificada.
+      await tx.inventario.create({
+        data: {
+          bookId: newBook.id,
+          sucursalId: sucursalId,
+          stock: stock,
+        },
+      });
 
-    // Calculate total amount
-    let totalAmount = 0
-    const saleItems = []
+      return newBook;
+    });
 
-    for (const item of items) {
-      const book = books.find((b) => b.id === item.book_id)!
-      const subtotal = item.unit_price * item.quantity
-      totalAmount += subtotal
-
-      saleItems.push({
-        book_id: item.book_id,
-        book_title: book.titulo,
-        quantity: item.quantity,
-        unit_price: item.unit_price,
-        subtotal,
-      })
-    }
-
-    // Create sale record
-    const newSale = {
-      id: Math.max(...sales.map((s) => s.id), 0) + 1,
-      fecha: new Date().toISOString(),
-      monto_total: totalAmount,
-      items_count: items.reduce((sum: number, item: any) => sum + item.quantity, 0),
-    }
-
-    sales.push(newSale)
-
-    // Create sale details and update stock
-    for (const item of items) {
-      const saleDetail = {
-        id: Math.max(...saleDetails.map((sd) => sd.id), 0) + 1,
-        sale_id: newSale.id,
-        book_id: item.book_id,
-        cantidad_vendida: item.quantity,
-        precio_unitario: item.unit_price,
-        subtotal: item.unit_price * item.quantity,
-      }
-
-      saleDetails.push(saleDetail)
-
-      // Update book stock
-      const bookIndex = books.findIndex((b) => b.id === item.book_id)
-      if (bookIndex !== -1) {
-        books[bookIndex].stock -= item.quantity
-      }
-    }
-
-    // Send WhatsApp notification
-    await sendWhatsAppNotification(newSale)
-
-    return NextResponse.json(
-      {
-        sale: newSale,
-        items: saleItems,
-        message: "Sale processed successfully",
-      },
-      { status: 201 },
-    )
+    return NextResponse.json(nuevoLibroConInventario, { status: 201 });
   } catch (error) {
-    console.error("Error processing sale:", error)
-    return NextResponse.json({ error: "Failed to process sale" }, { status: 500 })
+    console.error("Error al crear el libro y su inventario:", error);
+    // Devuelve un mensaje de error más específico si es posible
+    if (error instanceof Error && error.message.includes('sucursal')) {
+         return NextResponse.json({ message: 'La sucursal especificada no existe.' }, { status: 404 });
+    }
+    return NextResponse.json({ message: 'Error al crear el libro' }, { status: 500 });
   }
 }
