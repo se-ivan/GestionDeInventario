@@ -28,24 +28,33 @@ model User {
 }
 
 model Book {
-  id              Int        @id @default(autoincrement())
-  isbn            String?    @unique
+  id              Int          @id @default(autoincrement())
+  isbn            String?      
   titulo          String
   autor           String
-  precio          Decimal    @db.Decimal(10, 2)
+  precio          Decimal      @db.Decimal(10, 2)
   editorial       String?
   coleccion       String?
-  anioPublicacion Int?       @map("anio_publicacion")
+  anioPublicacion Int?         @map("anio_publicacion")
   genero          String?
-  createdAt       DateTime   @default(now()) @map("created_at")
-  updatedAt       DateTime   @updatedAt @map("updated_at")
-  stock           Int        @default(0)
-  // Relaciones
+  createdAt       DateTime     @default(now()) @map("created_at")
+  updatedAt       DateTime     @updatedAt @map("updated_at")
   inventario      Inventario[]
   saleDetails     SaleDetail[]
 
   @@index([titulo])
   @@map("books")
+}
+
+model Inventario {
+  bookId     Int      @map("book_id")
+  book       Book     @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  sucursalId Int      @map("sucursal_id")
+  sucursal   Sucursal @relation(fields: [sucursalId], references: [id], onDelete: Cascade)
+  stock      Int      @default(0)
+
+  @@id([bookId, sucursalId])
+  @@map("inventario")
 }
 
 model Sucursal {
@@ -60,17 +69,6 @@ model Sucursal {
   users      User[]
   @@map("sucursales")
   
-}
-
-model Inventario {
-  bookId     Int      @map("book_id")
-  book       Book     @relation(fields: [bookId], references: [id], onDelete: Cascade)
-  sucursalId Int      @map("sucursal_id")
-  sucursal   Sucursal @relation(fields: [sucursalId], references: [id], onDelete: Cascade)
-  stock      Int      @default(0)
-
-  @@id([bookId, sucursalId])
-  @@map("inventario")
 }
 
 model Sale {
