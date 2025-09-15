@@ -81,8 +81,20 @@ export async function sendWhatsAppReceipt(data: ReceiptData) {
 
   // la lógica para formatear la fecha, hora, libros, etc.
   const now = new Date()
-  const fecha = now.toLocaleDateString("es-MX", { day: "2-digit", month: "long", year: "numeric" })
-  const hora = now.toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit", hour12: true })
+  const timeZone = "America/Mexico_City" 
+  const fecha = now.toLocaleDateString("es-MX", {
+    day: "2-digit",
+    month: "long",
+    year: "numeric",
+    timeZone,
+  })
+
+  const hora = now.toLocaleTimeString("es-MX", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: true,
+    timeZone,
+  })
   const detalleLibros = data.items
     .map((item) => `- ${item.quantity}x ${item.titulo} ($${(Number(item.precio) * item.quantity).toFixed(2)})`)
     .join("\n")
