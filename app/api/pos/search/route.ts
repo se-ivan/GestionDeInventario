@@ -14,32 +14,49 @@ export async function GET(request: Request) {
   }
 
   try {
-    const searchResults = await prisma.inventario.findMany({
+    // Buscamos en la tabla de Inventario, filtrando por sucursal
+    // e incluyendo los datos del libro relacionado que coincidan con la búsqueda.
+    const results = await prisma.inventario.findMany({
       where: {
-        // Busca solo en la sucursal especificada
+        // Filtro principal: solo de la sucursal seleccionada
         sucursalId: Number(sucursalId),
-        // Y que el libro relacionado coincida con la búsqueda
-        book: {
-          OR: [
-            { titulo: { contains: query, mode: 'insensitive' } },
-            { autor: { contains: query, mode: 'insensitive' } },
-            { isbn: { contains: query, mode: 'insensitive' } },
-          ],
-        },
-        // Opcional: solo mostrar resultados con stock > 0
+        // Y el stock debe ser mayor a 0 para que sea vendible
         stock: {
           gt: 0,
         },
+        // Filtro anidado: busca dentro del modelo 'book' relacionado
+        book: {
+          OR: [
+            {
+              titulo: {
+                contains: query,
+                mode: 'insensitive', // No distingue mayúsculas/minúsculas
+              },
+            },
+            {
+              autor: {
+                contains: query,
+                mode: 'insensitive',
+              },
+            },
+            {
+              isbn: {
+                equals: query,
+              },
+            },
+          ],
+        },
       },
-      // Incluir los datos completos del libro en la respuesta
+      // Incluimos toda la información del libro en la respuesta
       include: {
         book: true,
       },
+      take: 20, // Limita el número de resultados para mejorar el rendimiento
     });
 
-    return NextResponse.json(searchResults);
+    return NextResponse.json(results);
   } catch (error) {
     console.error("Error en la búsqueda del POS:", error);
-    return NextResponse.json({ message: 'Error al realizar la búsqueda' }, { status: 500 });
+    return NextResponse.json({ message: 'Error al buscar productos' }, { status: 500 });
   }
 }

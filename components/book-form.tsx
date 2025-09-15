@@ -17,7 +17,6 @@ interface BookFormProps {
 }
 
 export function BookForm({ initialData, onSubmit, onCancel, isEditing = false, sucursales = [], onTransfer }: BookFormProps) {
-  // Estado del formulario que incluye los nuevos campos
   const [formData, setFormData] = useState({
     isbn: initialData?.book.isbn || "",
     titulo: initialData?.book.titulo || "",
@@ -31,25 +30,68 @@ export function BookForm({ initialData, onSubmit, onCancel, isEditing = false, s
     sucursalId: initialData?.sucursalId || 0,
   });
 
-  // Estado para la lógica de transferencia
+  const [isSearching, setIsSearching] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
+  
   const [transferData, setTransferData] = useState({
     destSucursalId: 0,
     quantity: 1,
   });
+  
+  const handleIsbnSearch = async () => {
+    if (!formData.isbn) {
+      setSearchError("Por favor, introduce un ISBN para buscar.");
+      return;
+    }
+    setIsSearching(true);
+    setSearchError(null);
+
+    // --- MODIFICADO: Usamos la variable de entorno para la API Key ---
+    const apiKey = process.env.NEXT_PUBLIC_GOOGLE_BOOKS_API_KEY;
+    if (!apiKey) {
+        setSearchError("La clave de API no está configurada. Contacta al administrador.");
+        setIsSearching(false);
+        return;
+    }
+    const url = `https://www.googleapis.com/books/v1/volumes?q=isbn:${formData.isbn}&key=${apiKey}`;
+    // --- FIN MODIFICADO ---
+
+    try {
+      const response = await fetch(url); // Usamos la nueva URL con la clave
+      const data = await response.json();
+
+      if (data.totalItems > 0) {
+        const bookInfo = data.items[0].volumeInfo;
+        const year = bookInfo.publishedDate ? new Date(bookInfo.publishedDate).getFullYear() : undefined;
+        setFormData(prev => ({
+          ...prev,
+          titulo: bookInfo.title || "",
+          autor: bookInfo.authors ? bookInfo.authors.join(', ') : "",
+          editorial: bookInfo.publisher || "",
+          anioPublicacion: year,
+          genero: bookInfo.categories ? bookInfo.categories[0] : "",
+        }));
+      } else {
+        setSearchError("No se encontró ningún libro con ese ISBN.");
+      }
+    } catch (error) {
+      console.error("Error al buscar en Google Books API:", error);
+      setSearchError("Hubo un error al conectar con el servicio de búsqueda.");
+    } finally {
+      setIsSearching(false);
+    }
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    // Prepara el objeto de datos completo antes de enviarlo
     const fullFormData = {
       ...formData,
       precio: Number(formData.precio),
       stock: Number(formData.stock),
-      // Asegura que el año de publicación sea un número o nulo para la base de datos
       anioPublicacion: formData.anioPublicacion ? Number(formData.anioPublicacion) : null,
     };
 
     if (isEditing && initialData) {
-      // Si se está editando, envía un objeto estructurado
       onSubmit({
         bookData: {
           isbn: fullFormData.isbn,
@@ -68,7 +110,6 @@ export function BookForm({ initialData, onSubmit, onCancel, isEditing = false, s
         }
       });
     } else {
-      // Si se está creando, envía el objeto plano
       onSubmit(fullFormData as BookFormData);
     }
   };
@@ -105,29 +146,34 @@ export function BookForm({ initialData, onSubmit, onCancel, isEditing = false, s
           {isEditing ? `Gestionar "${formData.titulo}"` : 'Datos del Nuevo Libro'}
         </h3>
         <div className="space-y-4">
-          {/* --- Título y Autor --- */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2"><Label htmlFor="titulo">Título</Label><Input id="titulo" value={formData.titulo} onChange={(e) => handleInputChange("titulo", e.target.value)} required /></div>
             <div className="space-y-2"><Label htmlFor="autor">Autor</Label><Input id="autor" value={formData.autor} onChange={(e) => handleInputChange("autor", e.target.value)} required /></div>
           </div>
-          {/* --- ISBN y Precio --- */}
+          
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2"><Label htmlFor="isbn">ISBN</Label><Input id="isbn" value={formData.isbn || ''} onChange={(e) => handleInputChange("isbn", e.target.value)} /></div>
+            <div className="space-y-2">
+              <Label htmlFor="isbn">ISBN</Label>
+              <div className="flex gap-2">
+                <Input id="isbn" value={formData.isbn || ''} onChange={(e) => handleInputChange("isbn", e.target.value)} placeholder="Introduce el ISBN y busca"/>
+                <Button type="button" onClick={handleIsbnSearch} disabled={isSearching}>
+                  {isSearching ? 'Buscando...' : 'Buscar'}
+                </Button>
+              </div>
+              {searchError && <p className="text-sm text-red-600 mt-1">{searchError}</p>}
+            </div>
             <div className="space-y-2"><Label htmlFor="precio">Precio</Label><Input id="precio" type="number" step="0.01" min="0" value={formData.precio} onChange={(e) => handleInputChange("precio", Number(e.target.value))} required /></div>
           </div>
 
-          {/* --- Editorial y Colección --- */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2"><Label htmlFor="editorial">Editorial</Label><Input id="editorial" value={formData.editorial || ''} onChange={(e) => handleInputChange("editorial", e.target.value)} /></div>
             <div className="space-y-2"><Label htmlFor="coleccion">Colección</Label><Input id="coleccion" value={formData.coleccion || ''} onChange={(e) => handleInputChange("coleccion", e.target.value)} /></div>
           </div>
-          {/* --- Año de Publicación y Género --- */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2"><Label htmlFor="anioPublicacion">Año de Publicación</Label><Input id="anioPublicacion" type="number" placeholder={(new Date().getFullYear()).toString()} value={formData.anioPublicacion || ''} onChange={(e) => handleInputChange("anioPublicacion", e.target.value ? Number(e.target.value) : undefined)} /></div>
             <div className="space-y-2"><Label htmlFor="genero">Género</Label><Input id="genero" value={formData.genero || ''} onChange={(e) => handleInputChange("genero", e.target.value)} /></div>
           </div>
 
-          {/* --- Lógica de Stock y Sucursal --- */}
           {isEditing ? (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
               <div className="space-y-2"><Label>Sucursal (Actual)</Label><Input value={sucursales.find(s => s.id === initialData?.sucursalId)?.nombre || 'N/A'} disabled /></div>

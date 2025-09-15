@@ -1,4 +1,6 @@
 // Representa un Libro tal como está en la base de datos.
+import { Book as PrismaBook, Sucursal as PrismaSucursal, Inventario as PrismaInventario } from '@prisma/client';
+
 export interface Book {
   id: number;
   isbn: string | null;
@@ -42,4 +44,8 @@ export interface BookFormData {
   // Campos para la creación del inventario inicial
   stock: number;
   sucursalId: number;
+}
+
+export interface InventarioEntry extends PrismaInventario {
+  book: Book; // Asegura que la data del libro está incluida
 }

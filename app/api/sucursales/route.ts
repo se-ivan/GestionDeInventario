@@ -1,17 +1,19 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 
-
 export async function GET() {
   try {
-    const sucursales = await prisma.sucursal.findMany();
+    const sucursales = await prisma.sucursal.findMany({
+      orderBy: {
+        nombre: 'asc', // Opcional: ordenar alfabéticamente
+      },
+    });
     return NextResponse.json(sucursales);
   } catch (error) {
     console.error("Error al obtener las sucursales:", error);
     return NextResponse.json({ message: 'Error al obtener las sucursales' }, { status: 500 });
   }
 }
-
 
 // Función para manejar peticiones POST (Crear una nueva sucursal)
 export async function POST(request: Request) {

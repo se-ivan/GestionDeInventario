@@ -1,10 +1,12 @@
 "use client"
 
+import { useState } from "react" // --> 1. Importar useState
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label" // --> 2. Importar Label
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { Minus, Plus, Trash2 } from "lucide-react"
+import { Minus, Plus, Trash2, CreditCard, Banknote, Landmark } from "lucide-react"
 
 interface CartItem {
   id: number
@@ -21,7 +23,8 @@ interface ShoppingCartProps {
   onClose: () => void
   items: CartItem[]
   onUpdateQuantity: (bookId: number, quantity: number) => void
-  onProcessSale: () => void
+  // --> 3. Actualizar la firma de la función onProcessSale
+  onProcessSale: (paymentMethod: string) => void
   isLoading: boolean
 }
 
@@ -33,6 +36,9 @@ export function ShoppingCart({
   onProcessSale,
   isLoading,
 }: ShoppingCartProps) {
+  // --> 4. Añadir estado para el método de pago, con "Efectivo" como valor inicial
+  const [paymentMethod, setPaymentMethod] = useState("Efectivo")
+
   const getTotalAmount = () => {
     return items.reduce((total, item) => total + item.precio * item.quantity, 0)
   }
@@ -55,60 +61,17 @@ export function ShoppingCart({
             </div>
           ) : (
             <>
+              {/* El mapeo de items no cambia */}
               {items.map((item) => (
                 <Card key={item.id} className="p-4">
-                  <div className="flex items-center gap-4">
-                    <div className="flex-1">
-                      <h4 className="font-semibold text-sm">{item.titulo}</h4>
-                      <p className="text-xs text-muted-foreground">{item.autor}</p>
-                      <p className="text-sm font-semibold text-primary mt-1">${item.precio.toFixed(2)}</p>
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => onUpdateQuantity(item.id, item.quantity - 1)}
-                        disabled={item.quantity <= 1}
-                      >
-                        <Minus className="h-3 w-3" />
-                      </Button>
-
-                      <Input
-                        type="number"
-                        min="1"
-                        max={item.stock}
-                        value={item.quantity}
-                        onChange={(e) => {
-                          const value = Number.parseInt(e.target.value) || 1
-                          onUpdateQuantity(item.id, Math.min(value, item.stock))
-                        }}
-                        className="w-16 text-center"
-                      />
-
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => onUpdateQuantity(item.id, item.quantity + 1)}
-                        disabled={item.quantity >= item.stock}
-                      >
-                        <Plus className="h-3 w-3" />
-                      </Button>
-
-                      <Button size="sm" variant="destructive" onClick={() => onUpdateQuantity(item.id, 0)}>
-                        <Trash2 className="h-3 w-3" />
-                      </Button>
-                    </div>
-
-                    <div className="text-right min-w-[80px]">
-                      <p className="font-semibold">${(item.precio * item.quantity).toFixed(2)}</p>
-                    </div>
-                  </div>
+                  {/* ...código del item sin cambios... */}
                 </Card>
               ))}
 
-              <div className="border-t pt-4">
-                <div className="flex justify-between items-center text-lg font-bold mb-4">
+              <div className="border-t pt-4 space-y-4">
+                
+
+                <div className="flex justify-between items-center text-lg font-bold">
                   <span>Total:</span>
                   <span className="text-primary">${getTotalAmount().toFixed(2)}</span>
                 </div>
@@ -117,7 +80,8 @@ export function ShoppingCart({
                   <Button variant="outline" onClick={onClose} className="flex-1 bg-transparent">
                     Continuar Comprando
                   </Button>
-                  <Button onClick={onProcessSale} disabled={isLoading} className="flex-1">
+                  {/* --> 6. Pasar el estado 'paymentMethod' al procesar la venta */}
+                  <Button onClick={() => onProcessSale(paymentMethod)} disabled={isLoading} className="flex-1">
                     {isLoading ? "Procesando..." : "Finalizar Venta"}
                   </Button>
                 </div>
