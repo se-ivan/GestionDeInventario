@@ -81,10 +81,6 @@ export async function POST(request: Request) {
           data: { stock: { decrement: item.quantity } },
         });
 
-        await tx.book.update({
-          where: { id: item.book_id },
-          data: { stock: { decrement: item.quantity } },
-        });
       }
       return newSale;
     });
