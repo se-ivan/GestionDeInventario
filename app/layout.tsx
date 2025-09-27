@@ -1,4 +1,3 @@
-// NO LLEVA "use client"
 import type { Metadata } from "next"
 import { GeistSans } from "geist/font/sans"
 import { GeistMono } from "geist/font/mono"
@@ -7,8 +6,6 @@ import { Suspense } from "react"
 import { SidebarNav } from "@/components/sidebar-nav"
 import "./globals.css"
 
-// Esta es la configuración clave para no indexar
-// AHORA SÍ FUNCIONARÁ
 export const metadata: Metadata = {
   robots: {
     index: false,
@@ -30,7 +27,6 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode
 }>) {
-  // Ya no se necesita usePathname aquí
 
   return (
     <html lang="es"> {/* <-- Cambiado a "es" por consistencia */}

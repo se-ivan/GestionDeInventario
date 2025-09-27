@@ -1,4 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
+import prisma from "@/lib/prisma"
 
 // GET /api/dashboard/chart?period=week - Get chart data
 export async function GET(request: NextRequest) {
@@ -9,26 +10,37 @@ export async function GET(request: NextRequest) {
     const days = period === "month" ? 30 : 7
     const data = []
 
-    // Generate mock chart data
+    // Get sales data for the specified period
     for (let i = days - 1; i >= 0; i--) {
       const date = new Date()
       date.setDate(date.getDate() - i)
+      
+      const startOfDay = new Date(date.getFullYear(), date.getMonth(), date.getDate())
+      const endOfDay = new Date(date.getFullYear(), date.getMonth(), date.getDate() + 1)
 
-      // Simulate varying sales data
-      const baseRevenue = 100 + Math.random() * 400
-      const baseSales = 5 + Math.floor(Math.random() * 15)
+      // Get sales for this specific day
+      const dailySales = await prisma.sale.findMany({
+        where: {
+          fecha: {
+            gte: startOfDay,
+            lt: endOfDay
+          }
+        },
+        select: {
+          montoTotal: true
+        }
+      })
 
-      // Add some patterns (weekends lower, mid-week higher)
-      const dayOfWeek = date.getDay()
-      const weekendMultiplier = dayOfWeek === 0 || dayOfWeek === 6 ? 0.7 : 1.2
+      const salesCount = dailySales.length
+      const revenue = dailySales.reduce((sum, sale) => sum + Number(sale.montoTotal), 0)
 
       data.push({
         date: date.toLocaleDateString("es-ES", {
           month: "short",
           day: "numeric",
         }),
-        sales: Math.floor(baseSales * weekendMultiplier),
-        revenue: Math.floor(baseRevenue * weekendMultiplier),
+        sales: salesCount,
+        revenue: Math.floor(revenue),
       })
     }
 

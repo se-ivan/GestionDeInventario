@@ -27,11 +27,19 @@ interface Sale {
   items_count: number
 }
 
+interface StockDetail {
+  stock: number
+  sucursalId: number
+  sucursalNombre: string
+}
+
 interface Book {
   id: number
   titulo: string
   autor: string
-  stock: number
+  totalStock: number
+  minStock: number
+  stockDetails: StockDetail[]
   isbn: string
   precio: number
 }
@@ -76,7 +84,9 @@ export default function DashboardPage() {
       const booksResponse = await fetch("/api/books/low-stock")
       if (booksResponse.ok) {
         const booksData = await booksResponse.json()
+        const totalLowStock = booksData.length
         setLowStockBooks(booksData)
+        setStats(prev => ({ ...prev, lowStockCount: totalLowStock }))
       }
     } catch (error) {
       console.error("Error fetching dashboard data:", error)

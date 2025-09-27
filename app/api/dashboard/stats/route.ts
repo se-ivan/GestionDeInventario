@@ -1,24 +1,5 @@
 import { NextResponse } from "next/server"
-
-// Mock data - In production, replace with actual database queries
-const books: Array<{
-  id: number
-  isbn: string
-  titulo: string
-  autor: string
-  precio: number
-  stock: number
-  created_at: string
-  updated_at: string
-}> = []
-
-const sales = [
-  { fecha: new Date().toISOString(), monto_total: 48.49 },
-  { fecha: new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString(), monto_total: 71.48 },
-  { fecha: new Date(Date.now() - 1000 * 60 * 60 * 4).toISOString(), monto_total: 35.98 },
-  { fecha: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString(), monto_total: 89.99 },
-  { fecha: new Date(Date.now() - 1000 * 60 * 60 * 48).toISOString(), monto_total: 52.75 },
-]
+import prisma from "@/lib/prisma"
 
 // GET /api/dashboard/stats - Get dashboard statistics
 export async function GET() {
@@ -26,31 +7,78 @@ export async function GET() {
     const today = new Date()
     const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate())
     const startOfWeek = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000)
-    const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1)
+    const startOfMonth = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000) // Last 30 days instead of calendar month
 
-    // Calculate today's sales
-    const todaySales = sales.filter((sale) => new Date(sale.fecha) >= startOfDay)
-    const todayRevenue = todaySales.reduce((sum, sale) => sum + sale.monto_total, 0)
+    // Calculate today's sales and revenue
+    const todaySalesData = await prisma.sale.findMany({
+      where: {
+        fecha: {
+          gte: startOfDay
+        }
+      },
+      select: {
+        montoTotal: true
+      }
+    })
+
+    const todaySales = todaySalesData.length
+    const todayRevenue = todaySalesData.reduce((sum, sale) => sum + Number(sale.montoTotal), 0)
 
     // Calculate weekly revenue
-    const weeklySales = sales.filter((sale) => new Date(sale.fecha) >= startOfWeek)
-    const weeklyRevenue = weeklySales.reduce((sum, sale) => sum + sale.monto_total, 0)
+    const weeklySalesData = await prisma.sale.findMany({
+      where: {
+        fecha: {
+          gte: startOfWeek
+        }
+      },
+      select: {
+        montoTotal: true
+      }
+    })
+
+    const weeklyRevenue = weeklySalesData.reduce((sum, sale) => sum + Number(sale.montoTotal), 0)
 
     // Calculate monthly revenue
-    const monthlySales = sales.filter((sale) => new Date(sale.fecha) >= startOfMonth)
-    const monthlyRevenue = monthlySales.reduce((sum, sale) => sum + sale.monto_total, 0)
+    const monthlySalesData = await prisma.sale.findMany({
+      where: {
+        fecha: {
+          gte: startOfMonth
+        }
+      },
+      select: {
+        montoTotal: true
+      }
+    })
 
-    // Calculate low stock count
-    const lowStockCount = books.filter((book) => book.stock <= 5).length
+    const monthlyRevenue = monthlySalesData.reduce((sum, sale) => sum + Number(sale.montoTotal), 0)
+
+    // Get total books count
+    const totalBooks = await prisma.book.count()
+
+    // Calculate low stock count (books with stock <= 2 in any branch)
+    const lowStockBooks = await prisma.book.count({
+      where: {
+        inventario: {
+          some: {
+            stock: {
+              lte: 2
+            }
+          }
+        }
+      }
+    })
+
+    // Get total customers (unique sales count as simplified customer metric)
+    const totalSales = await prisma.sale.count()
 
     const stats = {
-      todaySales: todaySales.length,
+      todaySales,
       todayRevenue,
-      totalBooks: books.length,
-      lowStockCount,
+      totalBooks,
+      lowStockCount: lowStockBooks,
       weeklyRevenue,
       monthlyRevenue,
-      totalCustomers: sales.length, // Simplified - each sale = 1 customer
+      totalCustomers: totalSales, // Simplified - total sales as customer metric
     }
 
     return NextResponse.json(stats)

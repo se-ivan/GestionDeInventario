@@ -17,7 +17,7 @@ model User {
   nombre     String
   email      String   @unique
   password   String
-  rol        String   // Por ejemplo: 'ADMIN' o 'VENDEDOR'
+  rol        String   
   createdAt  DateTime @default(now()) @map("created_at")
 
   // --- Relación con Sucursal ---
