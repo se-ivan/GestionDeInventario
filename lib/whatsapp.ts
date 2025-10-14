@@ -95,9 +95,24 @@ export async function sendWhatsAppReceipt(data: ReceiptData) {
     hour12: true,
     timeZone,
   })
-  const detalleLibros = data.items
-    .map((item) => `- ${item.quantity}x ${item.titulo} ($${(Number(item.precio) * item.quantity).toFixed(2)})`)
-    .join("\n")
+  // Format books with a limit to avoid WhatsApp API issues
+  let detalleLibros = ""
+  if (data.items.length <= 3) {
+    // For 3 or fewer items, show all details with pipe separator
+    detalleLibros = data.items
+      .map((item) => `${item.quantity}x ${item.titulo} ($${(Number(item.precio) * item.quantity).toFixed(2)})`)
+      .join(" | ")
+  } else {
+    // For more than 3 items, show first 2 and summarize the rest
+    const firstTwoItems = data.items.slice(0, 2)
+      .map((item) => `${item.quantity}x ${item.titulo} ($${(Number(item.precio) * item.quantity).toFixed(2)})`)
+      .join(" | ")
+    
+    const remainingCount = data.items.length - 2
+    const remainingTotal = data.items.slice(2).reduce((sum, item) => sum + (Number(item.precio) * item.quantity), 0)
+    
+    detalleLibros = `${firstTwoItems} | +${remainingCount} libros mas ($${remainingTotal.toFixed(2)})`
+  }
   const totalFormateado = new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN" }).format(
     data.totalAmount,
   )
