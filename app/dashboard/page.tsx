@@ -121,6 +121,19 @@ export default function DashboardPage() {
     }
   }
 
+  const getCurrentDaysPeriod = () => {
+    switch (selectedPeriod) {
+      case "today":
+        return "Dia de Hoy"
+      case "week":
+        return "Ultimos 7 Dias"
+      case "month":
+        return "Ultimos 30 Dias"
+      default:
+        return "Dia de Hoy"
+    }
+  }
+
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
@@ -128,12 +141,7 @@ export default function DashboardPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center gap-3">
-              <Link href="/">
-                <Button variant="ghost" size="sm">
-                  <ArrowLeft className="h-4 w-4 mr-2" />
-                  Volver al POS
-                </Button>
-              </Link>
+              
               <TrendingUp className="h-8 w-8 text-primary" />
               <h1 className="text-xl font-semibold text-card-foreground">Panel de Control</h1>
             </div>
@@ -224,8 +232,9 @@ export default function DashboardPage() {
             {/* Sales Chart */}
             <Card className="p-6">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-card-foreground">Ventas por Día</h3>
-                <Badge variant="secondary">Últimos 7 días</Badge>
+                <h3 className="text-lg font-semibold text-card-foreground">Ventas ({getPeriodLabel()}) </h3>
+
+                <Badge variant="secondary">{getCurrentDaysPeriod()}</Badge>
               </div>
               <SalesChart period={selectedPeriod} />
             </Card>
