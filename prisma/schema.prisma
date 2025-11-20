@@ -1,27 +1,27 @@
-// 1. Configuración de la conexión a la base de datos
-datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
-}
-
-// 2. Generador del Cliente de Prisma
 generator client {
   provider        = "prisma-client-js"
   previewFeatures = ["fullTextSearchPostgres"]
 }
 
-// 3. Modelos de Datos
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum PaymentMethod {
+  EFECTIVO
+  TARJETA
+  TRANSFERENCIA
+}
 
 model User {
-  id         Int      @id @default(autoincrement())
+  id         Int       @id @default(autoincrement())
   nombre     String
-  email      String   @unique
+  email      String    @unique
   password   String
-  rol        String   
-  createdAt  DateTime @default(now()) @map("created_at")
-
-  // --- Relación con Sucursal ---
-  sucursalId Int?     @map("sucursal_id")
+  rol        String
+  createdAt  DateTime  @default(now()) @map("created_at")
+  sucursalId Int?      @map("sucursal_id")
   sucursal   Sucursal? @relation(fields: [sucursalId], references: [id])
 
   @@map("users")
@@ -29,16 +29,17 @@ model User {
 
 model Book {
   id              Int          @id @default(autoincrement())
-  isbn            String?      
+  isbn            String?
   titulo          String
   autor           String
-  precio          Decimal      @db.Decimal(10, 2)
+  precioVenta     Decimal      @map("precio") @db.Decimal(10, 2)
+  precioCompra    Decimal      @default(0) @map("precio_compra") @db.Decimal(10, 2)
   editorial       String?
-  coleccion       String?
   anioPublicacion Int?         @map("anio_publicacion")
   genero          String?
   createdAt       DateTime     @default(now()) @map("created_at")
   updatedAt       DateTime     @updatedAt @map("updated_at")
+  coleccion       String?
   inventario      Inventario[]
   saleDetails     SaleDetail[]
 
@@ -48,38 +49,34 @@ model Book {
 
 model Inventario {
   bookId     Int      @map("book_id")
-  book       Book     @relation(fields: [bookId], references: [id], onDelete: Cascade)
   sucursalId Int      @map("sucursal_id")
-  sucursal   Sucursal @relation(fields: [sucursalId], references: [id], onDelete: Cascade)
   stock      Int      @default(0)
+  book       Book     @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  sucursal   Sucursal @relation(fields: [sucursalId], references: [id], onDelete: Cascade)
 
   @@id([bookId, sucursalId])
   @@map("inventario")
 }
 
 model Sucursal {
-  id         Int        @id @default(autoincrement())
-  nombre     String     @unique
+  id         Int          @id @default(autoincrement())
+  nombre     String       @unique
   direccion  String?
-  createdAt  DateTime   @default(now()) @map("created_at")
-  updatedAt  DateTime   @updatedAt @map("updated_at")
-
-  // Relación
+  createdAt  DateTime     @default(now()) @map("created_at")
+  updatedAt  DateTime     @updatedAt @map("updated_at")
   inventario Inventario[]
   users      User[]
+
   @@map("sucursales")
-  
 }
 
 model Sale {
-  id         Int        @id @default(autoincrement())
-  fecha      DateTime   @default(now())
-  montoTotal Decimal    @map("monto_total") @db.Decimal(10, 2)
-  createdAt  DateTime   @default(now()) @map("created_at")
-
-  // Relación
+  id         Int          @id @default(autoincrement())
+  fecha      DateTime     @default(now())
+  montoTotal Decimal      @map("monto_total") @db.Decimal(10, 2)
+  createdAt  DateTime     @default(now()) @map("created_at")
   details    SaleDetail[]
-
+  metodoPago   PaymentMethod @default(EFECTIVO) @map("metodo_pago")
   @@index([fecha])
   @@map("sales")
 }
@@ -88,14 +85,41 @@ model SaleDetail {
   id              Int      @id @default(autoincrement())
   cantidadVendida Int      @map("cantidad_vendida")
   precioUnitario  Decimal  @map("precio_unitario") @db.Decimal(10, 2)
+  descuento       Decimal  @default(0) @db.Decimal(10, 2)
   subtotal        Decimal  @db.Decimal(10, 2)
   createdAt       DateTime @default(now()) @map("created_at")
-
-  // Relaciones
   saleId          Int      @map("sale_id")
-  sale            Sale     @relation(fields: [saleId], references: [id], onDelete: Cascade)
   bookId          Int      @map("book_id")
   book            Book     @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  sale            Sale     @relation(fields: [saleId], references: [id], onDelete: Cascade)
 
   @@map("sale_details")
+}
+
+model busquedas_pendientes {
+  id                   Int       @id @default(autoincrement())
+  titulo               String    @db.VarChar(255)
+  autor                String?   @db.VarChar(255)
+  isbn                 String?   @db.VarChar(20)
+  editorial            String?   @db.VarChar(255)
+  genero               String?   @db.VarChar(100)
+  descripcion          String?
+  precio_estimado      Decimal?  @db.Decimal(10, 2)
+  cliente_nombre       String    @db.VarChar(255)
+  cliente_telefono     String    @db.VarChar(20)
+  cliente_email        String?   @db.VarChar(255)
+  cliente_notas        String?
+  estado               String?   @default("pendiente") @db.VarChar(50)
+  prioridad            String?   @default("media") @db.VarChar(20)
+  fecha_solicitud      DateTime? @default(now()) @db.Timestamp(6)
+  fecha_limite         DateTime? @db.Date
+  fecha_actualizacion  DateTime? @default(now()) @db.Timestamp(6)
+  notas_internas       String?
+  precio_encontrado    Decimal?  @db.Decimal(10, 2)
+  proveedor_encontrado String?   @db.VarChar(255)
+
+  @@index([cliente_telefono], map: "idx_busquedas_cliente_telefono")
+  @@index([estado], map: "idx_busquedas_estado")
+  @@index([fecha_solicitud], map: "idx_busquedas_fecha_solicitud")
+  @@index([prioridad], map: "idx_busquedas_prioridad")
 }
