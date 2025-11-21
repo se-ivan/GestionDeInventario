@@ -6,7 +6,8 @@ export interface Book {
   isbn: string | null;
   titulo: string;
   autor: string;
-  precio: number;
+  precioVenta: number;
+  precioCompra: number;
   // --- CAMPOS AÑADIDOS ---
   editorial: string | null;
   coleccion: string | null;

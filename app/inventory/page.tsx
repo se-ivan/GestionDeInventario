@@ -159,7 +159,7 @@ export default function InventoryPage() {
     {
       title: "Valor Total Inventario",
       value: `$${inventory.reduce((total, entry) => {
-        return entry.book ? total + (entry.book.precio * entry.stock) : total;
+        return entry.book ? total + (entry.book.precioVenta * entry.stock) : total;
       }, 0).toFixed(2)}`,
       icon: Package,
       color: "text-purple-600",
@@ -212,6 +212,7 @@ export default function InventoryPage() {
                 <th className="px-6 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">Autor</th>
                 <th className="px-6 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">Sucursal</th>
                 <th className="px-6 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">Precio</th>
+                <th className="px-6 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">Costo Unitario</th>
                 <th className="px-6 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">Stock</th>
                 <th className="px-6 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">ISBN</th>
                 <th className="px-6 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">Acciones</th>
@@ -228,7 +229,8 @@ export default function InventoryPage() {
                     <td className="px-6 py-4 font-medium">{entry.book.titulo}</td>
                     <td className="px-6 py-4 text-slate-600">{entry.book.autor}</td>
                     <td className="px-6 py-4 text-slate-600 font-semibold">{entry.sucursal.nombre}</td>
-                    <td className="px-6 py-4 text-slate-600">{new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(entry.book.precio)}</td>
+                    <td className="px-6 py-4 text-slate-600">{new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(entry.book.precioVenta)}</td>
+                    <td className="px-6 py-4 text-slate-600">{new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(entry.book.precioCompra)}</td>
                     <td className="px-6 py-4">
                       <span className={`px-2.5 py-1 text-xs font-medium rounded-full ${entry.stock <= 5 ? "bg-yellow-100 text-yellow-800" : "bg-green-100 text-green-800"}`}>
                         {entry.stock} unidades

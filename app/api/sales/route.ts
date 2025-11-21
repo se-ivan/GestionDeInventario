@@ -29,9 +29,6 @@ export async function POST(request: Request) {
       );
     }
 
-    // =======================================================================
-    //  INICIO DE LA TRANSACCIÓN DE VENTA (Tu código original sin cambios)
-    // =======================================================================
     const saleResult = await prisma.$transaction(async (tx) => {
       for (const item of items) {
         const inventarioItem = await tx.inventario.findUnique({
@@ -50,7 +47,7 @@ export async function POST(request: Request) {
         where: { id: { in: bookIds } },
       });
 
-      const priceMap = new Map(booksInDb.map(book => [book.id, book.precio]));
+      const priceMap = new Map(booksInDb.map(book => [book.id, book.precioVenta]));
 
       let montoTotal = 0;
       for (const item of items) {
@@ -104,7 +101,7 @@ export async function POST(request: Request) {
           return {
             titulo: details?.titulo || 'N/A',
             quantity: item.quantity,
-            precio: details?.precio || 0,
+            precio: details?.precioVenta || 0,
           };
         });
 
