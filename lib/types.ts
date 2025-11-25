@@ -13,6 +13,7 @@ export interface Book {
   coleccion: string | null;
   anioPublicacion: number | null;
   genero: string | null;
+  tasaIva: number | null;
 }
 
 // Representa una Sucursal.
@@ -27,9 +28,13 @@ export interface InventarioEntry {
   bookId: number;
   sucursalId: number;
   stock: number;
+  minStock: number | null;
+  ubicacion?: string | null;
   book: Book;
   sucursal: Sucursal;
 }
+
+
 
 // Representa los datos que el formulario de libros maneja.
 export interface BookFormData {

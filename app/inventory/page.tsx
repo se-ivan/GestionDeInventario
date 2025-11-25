@@ -14,9 +14,12 @@ export default function InventoryPage() {
   const [inventory, setInventory] = useState<InventarioEntry[]>([])
   const [filteredInventory, setFilteredInventory] = useState<InventarioEntry[]>([])
   const [searchQuery, setSearchQuery] = useState("")
+  
+  // Dialogs
   const [isAddBookDialogOpen, setIsAddBookDialogOpen] = useState(false);
   const [isAddSucursalDialogOpen, setIsAddSucursalDialogOpen] = useState(false);
   const [editingEntry, setEditingEntry] = useState<InventarioEntry | null>(null)
+  
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
@@ -67,44 +70,71 @@ export default function InventoryPage() {
 
   const handleAddSucursal = async (data: { nombre: string; direccion?: string }) => {
     try {
-      await fetch('/api/sucursales', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
+      const response = await fetch('/api/sucursales', { 
+        method: 'POST', 
+        headers: { 'Content-Type': 'application/json' }, 
+        body: JSON.stringify(data) 
+      });
+      
+      if (!response.ok) throw new Error("Error al crear sucursal");
+      
       fetchSucursales();
       setIsAddSucursalDialogOpen(false);
     } catch (error) {
       console.error("Error adding sucursal:", error);
+      // Opcional: Podrías querer lanzar el error aquí también si SucursalForm maneja errores
     }
   };
 
+  // --- AQUÍ ESTÁ EL CAMBIO IMPORTANTE PARA EL ISBN ---
   const handleAddBook = async (data: BookFormData) => {
-    try {
-      await fetch('/api/books', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
-      fetchInventory();
-      setIsAddBookDialogOpen(false);
-    } catch (error) {
-      console.error("Error adding book:", error);
+    // 1. Eliminamos el try/catch envolvente para permitir que el error suba
+    const response = await fetch('/api/books', { 
+        method: 'POST', 
+        headers: { 'Content-Type': 'application/json' }, 
+        body: JSON.stringify(data) 
+    });
+
+    // 2. Si el backend dice error (ej. 409 Conflict), lanzamos el error
+    if (!response.ok) {
+        const errorData = await response.json();
+        // Esto le manda el mensaje "Ya existe un libro con este ISBN" al BookForm
+        throw new Error(errorData.message || "Error al crear el libro");
     }
+
+    // 3. Solo si todo sale bien, actualizamos la tabla y cerramos
+    await fetchInventory();
+    setIsAddBookDialogOpen(false);
   };
 
   const handleUpdateEntry = async (data: { bookData: Partial<Book>, inventoryData: { bookId: number, sucursalId: number, stock: number } }) => {
-    try {
-      await fetch(`/api/books/${data.inventoryData.bookId}`, {
+    // Paso 1: Actualizar datos del libro
+    const resBook = await fetch(`/api/books/${data.inventoryData.bookId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data.bookData),
-      });
+    });
 
-      await fetch(`/api/inventario`, {
+    if (!resBook.ok) {
+        const err = await resBook.json();
+        throw new Error(err.message || "Error al actualizar el libro");
+    }
+
+    // Paso 2: Actualizar datos de inventario
+    const resInv = await fetch(`/api/inventario`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data.inventoryData),
-      });
-      
-      setEditingEntry(null);
-      fetchInventory();
-    } catch (error) {
-      console.error("Error al actualizar la entrada:", error);
-      alert("Ocurrió un error al guardar los cambios.");
+    });
+
+    if (!resInv.ok) {
+        const err = await resInv.json();
+        throw new Error(err.message || "Error al actualizar inventario");
     }
+      
+    // Éxito
+    setEditingEntry(null);
+    await fetchInventory();
   };
 
   const handleTransfer = async (data: { bookId: number, sourceSucursalId: number, destSucursalId: number, quantity: number }) => {

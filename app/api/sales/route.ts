@@ -1,132 +1,149 @@
-// app/api/sales/route.ts
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-// --> 1. Importa la función para enviar mensajes de WhatsApp
-import { sendWhatsAppReceipt } from '@/lib/whatsapp'; 
+// import { sendWhatsAppReceipt } from '@/lib/whatsapp'; // Descomentar cuando configures WhatsApp
 
-// Interfaz actualizada para coincidir con tu frontend
+// Definimos el tipo de dato que esperamos recibir
 interface CartItemPayload {
-  book_id: number;
+  bookId: number; 
   quantity: number;
+}
+
+interface SaleRequestBody {
+  items: CartItemPayload[];
+  sucursalId: number;
+  paymentMethod: 'EFECTIVO' | 'TARJETA_DEBITO' | 'TARJETA_CREDITO' | 'TRANSFERENCIA';
+  userId?: number; 
 }
 
 export async function POST(request: Request) {
   try {
-    const body = await request.json();
-    // --> 2. Extrae 'paymentMethod' del cuerpo de la petición
-    //    Asegúrate de que tu frontend lo esté enviando.
-    const { items, sucursalId, paymentMethod } = body as { 
-      items: CartItemPayload[]; 
-      sucursalId: number;
-      paymentMethod: string; // Nuevo campo
-    };
+    const body: SaleRequestBody = await request.json();
+    const { items, sucursalId, paymentMethod, userId } = body;
 
-    // --> 3. Añade validación para el nuevo campo
-    if (!items || items.length === 0 || !sucursalId || !paymentMethod) {
-      return NextResponse.json(
-        { message: 'Faltan campos requeridos: productos, sucursal y método de pago son obligatorios.' },
-        { status: 400 }
-      );
+    // 1. Validaciones básicas
+    if (!items || items.length === 0) {
+      return NextResponse.json({ message: 'El carrito está vacío.' }, { status: 400 });
+    }
+    if (!sucursalId) {
+      return NextResponse.json({ message: 'Falta la sucursal ID.' }, { status: 400 });
     }
 
+    // 2. Transacción de Base de Datos (Todo o nada)
     const saleResult = await prisma.$transaction(async (tx) => {
-      for (const item of items) {
-        const inventarioItem = await tx.inventario.findUnique({
-          where: { bookId_sucursalId: { bookId: item.book_id, sucursalId: sucursalId } },
-        });
-
-        if (!inventarioItem || inventarioItem.stock < item.quantity) {
-          const book = await tx.book.findUnique({ where: { id: item.book_id } });
-          const bookTitle = book ? book.titulo : `Libro con ID ${item.book_id}`;
-          throw new Error(`Stock insuficiente para: "${bookTitle}".`);
-        }
-      }
-
-      const bookIds = items.map(item => item.book_id);
-      const booksInDb = await tx.book.findMany({
-        where: { id: { in: bookIds } },
-      });
-
-      const priceMap = new Map(booksInDb.map(book => [book.id, book.precioVenta]));
-
-      let montoTotal = 0;
-      for (const item of items) {
-        const price = priceMap.get(item.book_id);
-        if (!price) throw new Error(`El libro con ID ${item.book_id} no fue encontrado.`);
-        montoTotal += Number(price) * item.quantity;
-      }
       
-      const newSale = await tx.sale.create({
-        data: { montoTotal: montoTotal },
-      });
+      // A) Verificar Stock e Información de Libros
+      let saleSubtotal = 0;
+      let saleImpuestos = 0;
+      let saleTotal = 0;
+      const detailData = [];
 
       for (const item of items) {
-        const precioUnitario = priceMap.get(item.book_id)!;
-        
-        await tx.saleDetail.create({
-          data: {
-            saleId: newSale.id,
-            bookId: item.book_id,
-            cantidadVendida: item.quantity,
-            precioUnitario: precioUnitario,
-            subtotal: Number(precioUnitario) * item.quantity,
+        // Buscar libro y su inventario en la sucursal específica
+        const inventoryRecord = await tx.inventario.findUnique({
+          where: {
+            bookId_sucursalId: {
+              bookId: item.bookId,
+              sucursalId: sucursalId
+            }
           },
+          include: { book: true }
         });
 
+        // Validar existencia y stock
+        if (!inventoryRecord) {
+          throw new Error(`El libro con ID ${item.bookId} no existe en esta sucursal.`);
+        }
+        if (inventoryRecord.stock < item.quantity) {
+          throw new Error(`Stock insuficiente para "${inventoryRecord.book.titulo}". Disponible: ${inventoryRecord.stock}`);
+        }
+
+        // B) Cálculos Financieros (Vital para el SAT)
+        const precioFinalUnitario = Number(inventoryRecord.book.precioVenta);
+        const tasaIva = Number(inventoryRecord.book.tasaIva) || 0; 
+        const cantidad = item.quantity;
+
+        // Desglose inverso
+        const precioBaseUnitario = precioFinalUnitario / (1 + (tasaIva / 100));
+        const impuestoUnitario = precioFinalUnitario - precioBaseUnitario;
+
+        // Totales por línea
+        const subtotalLinea = precioBaseUnitario * cantidad;
+        const impuestoLinea = impuestoUnitario * cantidad;
+        const totalLinea = precioFinalUnitario * cantidad;
+
+        saleSubtotal += subtotalLinea;
+        saleImpuestos += impuestoLinea;
+        saleTotal += totalLinea;
+
+        detailData.push({
+          bookId: item.bookId,
+          cantidad: cantidad, 
+          precioUnitario: precioBaseUnitario, 
+          impuestoAplicado: impuestoLinea,
+          subtotal: subtotalLinea, 
+        });
+
+        // C) Actualizar Inventario
         await tx.inventario.update({
-          where: { bookId_sucursalId: { bookId: item.book_id, sucursalId: sucursalId } },
-          data: { stock: { decrement: item.quantity } },
+          where: {
+            bookId_sucursalId: { bookId: item.bookId, sucursalId: sucursalId }
+          },
+          data: {
+            stock: { decrement: cantidad }
+          }
         });
-
       }
+
+      // D) Crear la Venta (Cabecera)
+      const newSale = await tx.sale.create({
+        data: {
+          sucursalId: sucursalId,
+          userId: userId || 1, 
+          fecha: new Date(),
+          metodoPago: paymentMethod,
+          estado: "COMPLETADA",
+          
+          subtotal: saleSubtotal,
+          impuestos: saleImpuestos,
+          descuentoTotal: 0, 
+          montoTotal: saleTotal,
+          
+          // Detalles
+          details: {
+            create: detailData.map(d => {
+              // NOTA: Usamos los nombres exactos que tu schema.prisma espera actualmente.
+              return {
+                bookId: d.bookId,
+                cantidad_vendida: d.cantidad, 
+                precioUnitario: d.precioUnitario,
+                subtotal: d.subtotal,
+                descuentoAplicado: 0, // <-- CORREGIDO: Usamos descuentoAplicado en lugar de descuento
+                impuestoAplicado: d.impuestoAplicado // Aseguramos que este campo también se pase explícitamente
+              };
+            })
+          }
+        },
+        include: {
+          details: {
+            include: { book: true }
+          },
+          sucursal: true
+        }
+      });
+
       return newSale;
     });
-    // =======================================================================
-    //  FIN DE LA TRANSACCIÓN DE VENTA
-    // =======================================================================
 
+    return NextResponse.json({ 
+      message: "Venta registrada correctamente", 
+      saleId: saleResult.id,
+      total: saleResult.montoTotal 
+    }, { status: 201 });
 
-    // --> 4. INICIA EL PROCESO DE NOTIFICACIÓN (si la venta fue exitosa)
-    // Lo envolvemos en su propio try/catch para que un error aquí no cancele la respuesta exitosa.
-    try {
-      // Obtenemos los datos necesarios para la plantilla de WhatsApp
-      const [sucursal, books] = await Promise.all([
-        prisma.sucursal.findUnique({ where: { id: sucursalId } }),
-        prisma.book.findMany({ where: { id: { in: items.map(i => i.book_id) } } })
-      ]);
-
-      if (sucursal && books.length > 0) {
-        const itemsWithDetails = items.map(item => {
-          const details = books.find(b => b.id === item.book_id);
-          return {
-            titulo: details?.titulo || 'N/A',
-            quantity: item.quantity,
-            precio: details?.precioVenta || 0,
-          };
-        });
-
-        // Llamamos a la función que envía el mensaje
-        sendWhatsAppReceipt({
-          saleId: saleResult.id,
-          userName: "Vendedor POS", // Idealmente, obtienes esto de la sesión del usuario
-          sucursalName: sucursal.nombre,
-          items: itemsWithDetails,
-          totalAmount: saleResult.montoTotal,
-          paymentMethod: paymentMethod,
-        });
-      }
-    } catch (notificationError) {
-      console.error("La venta se guardó, pero falló el envío de la notificación por WhatsApp:", notificationError);
-    }
-    
-    // La respuesta al frontend no cambia, siempre es de éxito si la venta se guardó.
-    return NextResponse.json({ message: "Venta realizada con éxito", sale: saleResult }, { status: 201 });
-
-  } catch (error) {
-    console.error("Error al procesar la venta:", error);
-    if (error instanceof Error) {
-        return NextResponse.json({ message: error.message }, { status: 400 });
-    }
-    return NextResponse.json({ message: 'Error interno del servidor.' }, { status: 500 });
+  } catch (error: any) {
+    console.error("Error procesando venta:", error);
+    return NextResponse.json({ 
+      message: error.message || 'Error interno del servidor' 
+    }, { status: 500 });
   }
 }

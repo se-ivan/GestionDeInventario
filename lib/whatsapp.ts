@@ -1,187 +1,85 @@
-export const maxDuration = 300
+// lib/whatsapp.ts
 
-interface ReceiptData {
-  saleId: number
-  userName: string
-  sucursalName: string
-  items: { titulo: string; quantity: number; precio: number | any }[]
-  totalAmount: number | any
-  paymentMethod: string
-}
+export async function sendWhatsAppReceipt({
+  saleId,
+  userName,
+  sucursalName,
+  items,
+  totalAmount,
+  paymentMethod,
+}: {
+  saleId: number;
+  userName: string;
+  sucursalName: string;
+  items: { titulo: string; quantity: number; precio: number }[];
+  totalAmount: number;
+  paymentMethod: string;
+}) {
+  console.log("📨 [WhatsApp] Iniciando proceso de envío...");
 
-async function fetchWithRetry(url: string, options: RequestInit, maxRetries = 3): Promise<Response> {
-  for (let attempt = 1; attempt <= maxRetries; attempt++) {
-    try {
-      const controller = new AbortController()
-      const timeoutId = setTimeout(() => controller.abort(), 25000)
+  // 1. Verificación de Credenciales
+  const token = process.env.WHATSAPP_API_TOKEN;
+  const phoneId = process.env.WHATSAPP_PHONE_NUMBER_ID;
+  // NOTA: Asegúrate de tener un número destinatario definido o pasarlo como argumento
+  // Para pruebas, usaremos una variable de entorno, o puedes poner tu número directo aquí.
+  const recipientPhone = process.env.WHATSAPP_RECIPIENT_PHONE || "521XXXXXXXXXX"; 
 
-      const response = await fetch(url, {
-        ...options,
-        signal: controller.signal,
-      })
-
-      clearTimeout(timeoutId)
-
-      if (response.ok) {
-        return response
-      }
-
-      if (response.status === 429) {
-        const retryAfter = response.headers.get("retry-after")
-        const waitTime = retryAfter ? Number.parseInt(retryAfter) * 1000 : 2000 * attempt
-        console.log(`[v0] Rate limited, waiting ${waitTime}ms before retry ${attempt}`)
-        await new Promise((resolve) => setTimeout(resolve, waitTime))
-        continue
-      }
-
-      if (response.status >= 500) {
-        throw new Error(`Server error: ${response.status}`)
-      }
-
-      // For client errors (4xx), don't retry
-      const errorData = await response.json()
-      throw new Error(`WhatsApp API error: ${JSON.stringify(errorData)}`)
-    } catch (error) {
-      console.log(`[v0] Attempt ${attempt} failed:`, error instanceof Error ? error.message : error)
-
-      if (attempt === maxRetries) {
-        throw error
-      }
-
-      const baseDelay = 1000 * Math.pow(2, attempt - 1)
-      const jitter = Math.random() * 1000
-      const delay = baseDelay + jitter
-
-      console.log(`[v0] Retrying in ${delay}ms...`)
-      await new Promise((resolve) => setTimeout(resolve, delay))
-    }
+  if (!token || !phoneId) {
+    console.warn("⚠️ [WhatsApp] Faltan variables de entorno (TOKEN o PHONE_ID). No se envió el mensaje.");
+    return;
   }
 
-  throw new Error("Max retries exceeded")
-}
+  // 2. Construcción del Mensaje (Resumen del ticket)
+  // Formateamos los items para que se vean bonitos en una lista de texto
+  const itemsList = items
+    .map((item) => `• ${item.quantity}x ${item.titulo.substring(0, 20)}.. ($${item.precio.toFixed(2)})`)
+    .join("\n");
 
-export async function sendWhatsAppReceipt(data: ReceiptData) {
-  const ownerPhoneNumber = process.env.OWNER_WHATSAPP_NUMBER
-  const accessToken = process.env.WHATSAPP_ACCESS_TOKEN
-  const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID
+  const messageBody = `
+🧾 *Ticket de Venta #${saleId}*
+👤 Vendedor: ${userName}
+📍 Sucursal: ${sucursalName}
+📅 Fecha: ${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString()}
 
-  console.log("[v0] Starting WhatsApp receipt send process")
-  console.log("[v0] Sale ID:", data.saleId)
+*Productos:*
+${itemsList}
 
-  if (!ownerPhoneNumber) {
-    console.error("[v0] OWNER_WHATSAPP_NUMBER environment variable is not configured")
-    throw new Error("Owner phone number not configured")
-  }
-  if (!accessToken || !phoneNumberId) {
-    console.error("[v0] WhatsApp API credentials are missing")
-    throw new Error("WhatsApp API credentials missing")
-  }
+--------------------------------
+💰 *TOTAL: $${totalAmount.toFixed(2)}*
+💳 Pago: ${paymentMethod}
+--------------------------------
+  `.trim();
 
-  const apiUrl = `https://graph.facebook.com/v19.0/${phoneNumberId}/messages`
-
-  // la lógica para formatear la fecha, hora, libros, etc.
-  const now = new Date()
-  const timeZone = "America/Mexico_City" 
-  const fecha = now.toLocaleDateString("es-MX", {
-    day: "2-digit",
-    month: "long",
-    year: "numeric",
-    timeZone,
-  })
-
-  const hora = now.toLocaleTimeString("es-MX", {
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: true,
-    timeZone,
-  })
-  // Format books with a limit to avoid WhatsApp API issues
-  let detalleLibros = ""
-  if (data.items.length <= 3) {
-    // For 3 or fewer items, show all details with pipe separator
-    detalleLibros = data.items
-      .map((item) => `${item.quantity}x ${item.titulo} ($${(Number(item.precio) * item.quantity).toFixed(2)})`)
-      .join(" | ")
-  } else {
-    // For more than 3 items, show first 2 and summarize the rest
-    const firstTwoItems = data.items.slice(0, 2)
-      .map((item) => `${item.quantity}x ${item.titulo} ($${(Number(item.precio) * item.quantity).toFixed(2)})`)
-      .join(" | ")
-    
-    const remainingCount = data.items.length - 2
-    const remainingTotal = data.items.slice(2).reduce((sum, item) => sum + (Number(item.precio) * item.quantity), 0)
-    
-    detalleLibros = `${firstTwoItems} | +${remainingCount} libros mas ($${remainingTotal.toFixed(2)})`
-  }
-  const totalFormateado = new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN" }).format(
-    data.totalAmount,
-  )
-
-  const payload = {
-    messaging_product: "whatsapp",
-    to: ownerPhoneNumber,
-    type: "template",
-    template: {
-      name: "ticket_ventas",
-      language: { code: "es_MX" },
-      components: [
-        {
-          type: "header",
-          parameters: [
-            {
-              type: "text",
-              text: data.saleId.toString(),
-            },
-          ],
-        },
-        {
-          type: "body",
-          parameters: [
-            { type: "text", text: fecha },
-            { type: "text", text: hora },
-            { type: "text", text: data.userName },
-            { type: "text", text: detalleLibros },
-            { type: "text", text: totalFormateado },
-            { type: "text", text: data.paymentMethod },
-            { type: "text", text: data.sucursalName },
-          ],
-        },
-      ],
-    },
-  }
-
+  // 3. Envío a la API de Meta (WhatsApp Cloud API)
   try {
-    console.log("[v0] Sending WhatsApp message with retry logic")
-
-    const response = await fetchWithRetry(apiUrl, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(payload),
-    })
-
-    const responseData = await response.json()
-    console.log("[v0] WhatsApp API response:", responseData)
-    console.log(`[v0] Sale notification sent successfully to owner for sale ID: ${data.saleId}`)
-
-    return responseData
-  } catch (error) {
-    console.error("[v0] Failed to send WhatsApp notification:", error)
-
-    if (error instanceof Error) {
-      if (error.name === "AbortError") {
-        throw new Error("WhatsApp request timed out after 25 seconds")
+    const response = await fetch(
+      `https://graph.facebook.com/v17.0/${phoneId}/messages`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          messaging_product: "whatsapp",
+          to: recipientPhone, // El número que recibe la notificación (Admin o Cliente)
+          type: "text",
+          text: { body: messageBody },
+        }),
       }
-      if (error.message.includes("ETIMEDOUT")) {
-        throw new Error("Network timeout - please check your connection")
-      }
-      if (error.message.includes("Rate limited")) {
-        throw new Error("WhatsApp API rate limit exceeded - try again later")
-      }
+    );
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      console.error("❌ [WhatsApp] Error de API de Meta:", JSON.stringify(data, null, 2));
+      throw new Error(data.error?.message || "Error desconocido de WhatsApp API");
     }
 
-    throw error
+    console.log("✅ [WhatsApp] Mensaje enviado correctamente. ID:", data.messages?.[0]?.id);
+  } catch (error) {
+    console.error("❌ [WhatsApp] Falló la petición fetch:", error);
+    // Relanzamos el error para que route.ts lo capture y lo registre también
+    throw error;
   }
 }

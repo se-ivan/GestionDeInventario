@@ -1,17 +1,33 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 
-// La función GET no necesita cambios.
-export async function GET() {
+// GET: Obtener libros con su inventario
+export async function GET(request: Request) {
   try {
+    const { searchParams } = new URL(request.url);
+    const query = searchParams.get('q');
+
+    const whereClause = query
+      ? {
+          OR: [
+            { titulo: { contains: query, mode: 'insensitive' as const } },
+            { autor: { contains: query, mode: 'insensitive' as const } },
+            { isbn: { contains: query } },
+          ],
+        }
+      : {};
+
     const books = await prisma.book.findMany({
-      // Opcional: Incluir el inventario para ver el stock por sucursal.
+      where: whereClause,
       include: {
         inventario: {
           include: {
             sucursal: true,
           },
         },
+      },
+      orderBy: {
+        createdAt: 'desc',
       },
     });
     return NextResponse.json(books);
@@ -21,30 +37,48 @@ export async function GET() {
   }
 }
 
-
+// POST: Crear nuevo libro con inventario inicial
 export async function POST(request: Request) {
   try {
+    // Recibimos la estructura anidada que envía el BookForm
     const body = await request.json();
+    const { bookData, inventoryData } = body;
+
+    // Validación básica
+    if (!bookData || !inventoryData) {
+        return NextResponse.json({ message: 'Datos incompletos' }, { status: 400 });
+    }
+
+    // Asegurar que isbn sea null si viene vacío (doble check de seguridad)
+    const finalIsbn = bookData.isbn && bookData.isbn.trim() !== "" ? bookData.isbn.trim() : null;
 
     const newBook = await prisma.book.create({
       data: {
-        titulo: body.titulo,
-        autor: body.autor,
-        precio: body.precio,
-        isbn: body.isbn,
-        editorial: body.editorial,
-        coleccion: body.coleccion,
-        anioPublicacion: body.anioPublicacion,
-        genero: body.genero,
+        // Datos del Libro (Mapeo exacto al schema)
+        titulo: bookData.titulo,
+        autor: bookData.autor,
+        isbn: finalIsbn,
+        editorial: bookData.editorial,
+        coleccion: bookData.coleccion,
+        anioPublicacion: bookData.anioPublicacion,
+        genero: bookData.genero,
+        
+        // Campos financieros nuevos
+        precioVenta: bookData.precioVenta,   // Nota: En el schema es 'precioVenta', en la DB es 'precio'
+        precioCompra: bookData.precioCompra, // Nuevo
+        tasaIva: bookData.tasaIva,           // Nuevo
+
+        // Crear registro en Inventario al mismo tiempo (Transacción implícita)
         inventario: {
           create: {
-            sucursalId: body.sucursalId,
-            stock: body.stock,
+            sucursalId: inventoryData.sucursalId,
+            stock: inventoryData.stock,
+            minStock: inventoryData.minStock, // Nuevo
+            ubicacion: inventoryData.ubicacion // Nuevo
           },
         },
       },
       include: {
-        // Incluimos el inventario para devolver la entrada completa
         inventario: {
           include: {
             sucursal: true
@@ -54,12 +88,22 @@ export async function POST(request: Request) {
     });
 
     return NextResponse.json(newBook);
-  } catch (error) {
-    console.error("Error al crear el libro y su inventario:", error);
-    // Devuelve un mensaje de error más específico si es posible
-    if (error instanceof Error && error.message.includes('sucursal')) {
+  } catch (error: any) {
+    console.error("Error al crear el libro:", error);
+    if (error.code === 'P2003') {
+        return NextResponse.json({ 
+            message: 'La sucursal seleccionada no es válida o no existe.' 
+        }, { status: 400 });
+    }
+    // Manejo de errores específicos de Prisma
+    if (error.code === 'P2002') {
+        return NextResponse.json({ message: 'Ya existe un libro con este ISBN.' }, { status: 409 });
+    }
+    
+    if (error.message?.includes('sucursal')) {
          return NextResponse.json({ message: 'La sucursal especificada no existe.' }, { status: 404 });
     }
-    return NextResponse.json({ message: 'Error al crear el libro' }, { status: 500 });
+
+    return NextResponse.json({ message: 'Error interno al crear el libro' }, { status: 500 });
   }
 }
