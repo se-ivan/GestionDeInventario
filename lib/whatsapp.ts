@@ -1,85 +1,191 @@
-// lib/whatsapp.ts
+export const maxDuration = 300;
 
-export async function sendWhatsAppReceipt({
-  saleId,
-  userName,
-  sucursalName,
-  items,
-  totalAmount,
-  paymentMethod,
-}: {
+interface ReceiptData {
   saleId: number;
   userName: string;
   sucursalName: string;
-  items: { titulo: string; quantity: number; precio: number }[];
-  totalAmount: number;
+  items: { titulo: string; quantity: number; precio: number | any }[];
+  totalAmount: number | any;
   paymentMethod: string;
-}) {
-  console.log("📨 [WhatsApp] Iniciando proceso de envío...");
+}
 
-  // 1. Verificación de Credenciales
-  const token = process.env.WHATSAPP_API_TOKEN;
-  const phoneId = process.env.WHATSAPP_PHONE_NUMBER_ID;
-  // NOTA: Asegúrate de tener un número destinatario definido o pasarlo como argumento
-  // Para pruebas, usaremos una variable de entorno, o puedes poner tu número directo aquí.
-  const recipientPhone = process.env.WHATSAPP_RECIPIENT_PHONE || "521XXXXXXXXXX"; 
+// --- FUNCIÓN DE LIMPIEZA (CRÍTICA PARA EVITAR ERROR 132018) ---
+// Elimina enters, tabs y reduce espacios múltiples a uno solo.
+function sanitizeText(text: string): string {
+  if (!text) return "";
+  return text
+    .toString()
+    .replace(/(\r\n|\n|\r)/gm, " ") // Reemplaza saltos de línea por espacio
+    .replace(/\t/g, " ")            // Reemplaza tabs por espacio
+    .replace(/\s+/g, " ")           // Reemplaza múltiples espacios por uno solo
+    .trim();                        // Quita espacios al inicio y final
+}
 
-  if (!token || !phoneId) {
-    console.warn("⚠️ [WhatsApp] Faltan variables de entorno (TOKEN o PHONE_ID). No se envió el mensaje.");
-    return;
+async function fetchWithRetry(
+  url: string,
+  options: RequestInit,
+  maxRetries = 3
+): Promise<Response> {
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 25000);
+
+      const response = await fetch(url, {
+        ...options,
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+
+      if (response.ok) {
+        return response;
+      }
+
+      if (response.status === 429) {
+        const retryAfter = response.headers.get("retry-after");
+        const waitTime = retryAfter
+          ? Number.parseInt(retryAfter) * 1000
+          : 2000 * attempt;
+        console.log(
+          `[WhatsApp] Rate limited, esperando ${waitTime}ms antes del reintento ${attempt}`
+        );
+        await new Promise((resolve) => setTimeout(resolve, waitTime));
+        continue;
+      }
+
+      if (response.status >= 500) {
+        throw new Error(`Server error: ${response.status}`);
+      }
+
+      const errorData = await response.json();
+      throw new Error(`WhatsApp API error: ${JSON.stringify(errorData)}`);
+    } catch (error) {
+      console.log(
+        `[WhatsApp] Intento ${attempt} fallido:`,
+        error instanceof Error ? error.message : error
+      );
+
+      if (attempt === maxRetries) {
+        throw error;
+      }
+
+      const baseDelay = 1000 * Math.pow(2, attempt - 1);
+      const jitter = Math.random() * 1000;
+      const delay = baseDelay + jitter;
+
+      await new Promise((resolve) => setTimeout(resolve, delay));
+    }
   }
 
-  // 2. Construcción del Mensaje (Resumen del ticket)
-  // Formateamos los items para que se vean bonitos en una lista de texto
-  const itemsList = items
-    .map((item) => `• ${item.quantity}x ${item.titulo.substring(0, 20)}.. ($${item.precio.toFixed(2)})`)
-    .join("\n");
+  throw new Error("Max retries exceeded");
+}
 
-  const messageBody = `
-🧾 *Ticket de Venta #${saleId}*
-👤 Vendedor: ${userName}
-📍 Sucursal: ${sucursalName}
-📅 Fecha: ${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString()}
+export async function sendWhatsAppReceipt(data: ReceiptData) {
+  const ownerPhoneNumber = process.env.OWNER_WHATSAPP_NUMBER;
+  const accessToken = process.env.WHATSAPP_ACCESS_TOKEN;
+  const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
 
-*Productos:*
-${itemsList}
+  console.log("📨 [WhatsApp] Iniciando proceso de envío...");
+  console.log("[WhatsApp] Sale ID:", data.saleId);
 
---------------------------------
-💰 *TOTAL: $${totalAmount.toFixed(2)}*
-💳 Pago: ${paymentMethod}
---------------------------------
-  `.trim();
+  if (!ownerPhoneNumber || !accessToken || !phoneNumberId) {
+    console.error("❌ [WhatsApp] Faltan credenciales o número de teléfono");
+    throw new Error("WhatsApp API credentials missing");
+  }
 
-  // 3. Envío a la API de Meta (WhatsApp Cloud API)
-  try {
-    const response = await fetch(
-      `https://graph.facebook.com/v17.0/${phoneId}/messages`,
-      {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
+  const apiUrl = `https://graph.facebook.com/v19.0/${phoneNumberId}/messages`;
+
+  // 1. Fechas
+  const now = new Date();
+  const timeZone = "America/Mexico_City";
+  const fecha = now.toLocaleDateString("es-MX", {
+    day: "2-digit", month: "long", year: "numeric", timeZone,
+  });
+  const hora = now.toLocaleTimeString("es-MX", {
+    hour: "2-digit", minute: "2-digit", hour12: true, timeZone,
+  });
+
+  // 2. Limpieza de datos (SANITIZACIÓN)
+  const cleanUserName = sanitizeText(data.userName);
+  const cleanSucursal = sanitizeText(data.sucursalName);
+  const cleanPayment = sanitizeText(data.paymentMethod);
+
+  // 3. Construcción del detalle de libros con limpieza individual
+  let detalleLibros = "";
+  
+  // Mapeamos y limpiamos cada título individualmente antes de unir
+  const itemsFormatted = data.items.map((item) => {
+    const tituloLimpio = sanitizeText(item.titulo); 
+    // Aseguramos que el título no sea extremadamente largo para no romper la plantilla
+    const tituloCorto = tituloLimpio.length > 30 ? tituloLimpio.substring(0, 27) + "..." : tituloLimpio;
+    
+    return `${item.quantity}x ${tituloCorto} ($${(Number(item.precio) * item.quantity).toFixed(2)})`;
+  });
+
+  if (itemsFormatted.length <= 3) {
+    detalleLibros = itemsFormatted.join(" | ");
+  } else {
+    const firstTwoItems = itemsFormatted.slice(0, 2).join(" | ");
+    
+    const remainingCount = data.items.length - 2;
+    const remainingTotal = data.items
+      .slice(2)
+      .reduce((sum, item) => sum + Number(item.precio) * item.quantity, 0);
+
+    detalleLibros = `${firstTwoItems} | +${remainingCount} libros más ($${remainingTotal.toFixed(2)})`;
+  }
+
+  const totalFormateado = new Intl.NumberFormat("es-MX", {
+    style: "currency",
+    currency: "MXN",
+  }).format(data.totalAmount);
+
+  const payload = {
+    messaging_product: "whatsapp",
+    to: ownerPhoneNumber,
+    type: "template",
+    template: {
+      name: "ticket_ventas",
+      language: { code: "es_MX" },
+      components: [
+        {
+          type: "header",
+          parameters: [
+            { type: "text", text: sanitizeText(data.saleId.toString()) },
+          ],
         },
-        body: JSON.stringify({
-          messaging_product: "whatsapp",
-          to: recipientPhone, // El número que recibe la notificación (Admin o Cliente)
-          type: "text",
-          text: { body: messageBody },
-        }),
-      }
-    );
+        {
+          type: "body",
+          parameters: [
+            { type: "text", text: fecha },             // {{1}}
+            { type: "text", text: hora },              // {{2}}
+            { type: "text", text: cleanUserName },     // {{3}}
+            { type: "text", text: detalleLibros },     // {{4}} - Aquí estaba el error
+            { type: "text", text: totalFormateado },   // {{5}}
+            { type: "text", text: cleanPayment },      // {{6}}
+            { type: "text", text: cleanSucursal },     // {{7}}
+          ],
+        },
+      ],
+    },
+  };
 
-    const data = await response.json();
+  try {
+    const response = await fetchWithRetry(apiUrl, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    });
 
-    if (!response.ok) {
-      console.error("❌ [WhatsApp] Error de API de Meta:", JSON.stringify(data, null, 2));
-      throw new Error(data.error?.message || "Error desconocido de WhatsApp API");
-    }
-
-    console.log("✅ [WhatsApp] Mensaje enviado correctamente. ID:", data.messages?.[0]?.id);
+    const responseData = await response.json();
+    console.log(`✅ [WhatsApp] Enviado ID: ${data.saleId}`);
+    return responseData;
   } catch (error) {
-    console.error("❌ [WhatsApp] Falló la petición fetch:", error);
-    // Relanzamos el error para que route.ts lo capture y lo registre también
+    console.error("❌ [WhatsApp] Error fatal:", error);
     throw error;
   }
 }
