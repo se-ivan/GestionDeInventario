@@ -1,6 +1,6 @@
 generator client {
   provider        = "prisma-client-js"
-  previewFeatures = ["fullTextSearchPostgres"] // Útil para buscar libros por título
+  previewFeatures = ["fullTextSearchPostgres"]
 }
 
 datasource db {
@@ -14,7 +14,8 @@ enum PaymentMethod {
   TARJETA_DEBITO
   TARJETA_CREDITO
   TRANSFERENCIA
-  TARJETA
+  VALES
+  TARJETA 
 }
 
 enum UserRole {
@@ -31,185 +32,236 @@ enum DiscountType {
 // --- USUARIOS Y SUCURSALES ---
 
 model User {
-  id         Int       @id @default(autoincrement())
+  id         Int         @id @default(autoincrement())
   nombre     String
-  email      String    @unique
+  email      String      @unique
   password   String
-  rol        UserRole  @default(VENDEDOR)
-  activo     Boolean   @default(true)
-  sucursalId Int?      @map("sucursal_id")
-  sucursal   Sucursal? @relation(fields: [sucursalId], references: [id])
-  sales      Sale[]    // Relación: Ventas realizadas por este usuario
-  cajas      CorteCaja[] // Relación: Cortes de caja de este usuario
+  rol        UserRole    @default(VENDEDOR)
+  activo     Boolean     @default(true)
+  sucursalId Int?        @map("sucursal_id")
+  sucursal   Sucursal?   @relation(fields: [sucursalId], references: [id])
+  sales      Sale[]
+  cajas      CorteCaja[]
 
-  createdAt  DateTime  @default(now()) @map("created_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
   @@map("users")
 }
 
 model Sucursal {
-  id         Int          @id @default(autoincrement())
-  nombre     String       @unique
-  direccion  String?
-  serieFacturacion String? // Ej: "SUC-A" para folios fiscales internos
-  inventario Inventario[]
-  users      User[]
-  sales      Sale[]       // Relación: Ventas en esta sucursal
+  id               Int          @id @default(autoincrement())
+  nombre           String       @unique
+  direccion        String?
+  serieFacturacion String?
+  
+  // Relaciones con ambos inventarios
+  inventarioLibros Inventario[]
+  inventarioDulces InventarioDulce[]
+  
+  users            User[]
+  sales            Sale[]
 
-  createdAt  DateTime     @default(now()) @map("created_at")
-  updatedAt  DateTime     @updatedAt @map("updated_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
   @@map("sucursales")
 }
 
-// --- PRODUCTOS E INVENTARIO ---
+// --- MODELO ORIGINAL: LIBROS ---
 
 model Book {
-  id              Int       @id @default(autoincrement())
-  isbn            String?   @unique // Debe ser único
+  id              Int         @id @default(autoincrement())
+  isbn            String?     @unique
   titulo          String
   autor           String
-  precioVenta     Decimal   @map("precio") @db.Decimal(10, 2)
-  precioCompra    Decimal   @default(0) @map("precio_compra") @db.Decimal(10, 2)
   
-  // Contabilidad: Libros suelen ser IVA 0%, pero otros productos no.
-  tasaIva         Decimal   @default(0) @map("tasa_iva") @db.Decimal(5, 2) 
+  precioVenta     Decimal     @map("precio") @db.Decimal(10, 2)
+  precioCompra    Decimal     @default(0) @map("precio_compra") @db.Decimal(10, 2)
+  tasaIva         Decimal     @default(0) @map("tasa_iva") @db.Decimal(5, 2)
   
   editorial       String?
-  anioPublicacion Int?      @map("anio_publicacion")
+  anioPublicacion Int?        @map("anio_publicacion")
   genero          String?
   coleccion       String?
   
-  inventario      Inventario[]
-  saleDetails     SaleDetail[]
-  discounts       DiscountCampaign[] // Relación inversa para descuentos directos
+  inventario  Inventario[]
+  saleDetails SaleDetail[]
+  discounts   DiscountCampaign[]
 
-  createdAt       DateTime  @default(now()) @map("created_at")
-  updatedAt       DateTime  @updatedAt @map("updated_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   @@index([titulo])
   @@index([isbn])
   @@map("books")
 }
 
+// --- NUEVO MODELO: DULCERÍA ---
+// Específico para productos empaquetados o a granel
+model Dulce {
+  id            Int      @id @default(autoincrement())
+  codigoBarras  String?  @unique @map("codigo_barras") // EAN/UPC
+  nombre        String   // Ej. "Doritos Nacho"
+  marca         String?  // Ej. "Sabritas"
+  lineaProducto String?  // Ej. "Flaming Hot", "Clásico"
+  peso          String?  // Ej. "50g", "2L"
+  sabor         String?  // Ej. "Queso y Chile"
+  
+  precioVenta   Decimal  @map("precio") @db.Decimal(10, 2)
+  precioCompra  Decimal  @default(0) @map("precio_compra") @db.Decimal(10, 2)
+  tasaIva       Decimal  @default(0) @map("tasa_iva") @db.Decimal(5, 2) // IEPS suele ser 8%
+
+  // Relaciones propias
+  inventario  InventarioDulce[]
+  saleDetails SaleDetail[]
+  discounts   DiscountCampaign[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([nombre])
+  @@index([codigoBarras])
+  @@map("dulces")
+}
+
+// --- INVENTARIOS SEPARADOS ---
+
 model Inventario {
   bookId     Int      @map("book_id")
   sucursalId Int      @map("sucursal_id")
   stock      Int      @default(0)
-  minStock   Int      @default(5) @map("min_stock") // Alerta de reabastecimiento
-  ubicacion  String?  // Ej: "Pasillo 4, Estante B"
+  minStock   Int      @default(5) @map("min_stock")
+  ubicacion  String?  
   
-  book       Book     @relation(fields: [bookId], references: [id], onDelete: Cascade)
-  sucursal   Sucursal @relation(fields: [sucursalId], references: [id], onDelete: Cascade)
+  book     Book     @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  sucursal Sucursal @relation(fields: [sucursalId], references: [id], onDelete: Cascade)
 
   @@id([bookId, sucursalId])
   @@map("inventario")
 }
 
-// --- MARKETING Y DESCUENTOS ---
+model InventarioDulce {
+  dulceId    Int      @map("dulce_id")
+  sucursalId Int      @map("sucursal_id")
+  stock      Int      @default(0)
+  minStock   Int      @default(10) @map("min_stock")
+  ubicacion  String?  // Ej. "Refrigerador 1"
+  
+  dulce    Dulce    @relation(fields: [dulceId], references: [id], onDelete: Cascade)
+  sucursal Sucursal @relation(fields: [sucursalId], references: [id], onDelete: Cascade)
+
+  @@id([dulceId, sucursalId])
+  @@map("inventario_dulces")
+}
+
+// --- MARKETING ---
 
 model DiscountCampaign {
   id             Int          @id @default(autoincrement())
-  nombre         String       // "Descuento Verano", "Liquidación"
-  codigoCupon    String?      @unique @map("codigo_cupon") // Opcional: Para aplicar manualmente
+  nombre         String
+  codigoCupon    String?      @unique @map("codigo_cupon")
   tipo           DiscountType
   valor          Decimal      @db.Decimal(10, 2)
   activo         Boolean      @default(true)
   fechaInicio    DateTime     @map("fecha_inicio")
   fechaFin       DateTime     @map("fecha_fin")
 
-  // Alcance del descuento
-  aplicarAGenero String?      @map("aplicar_a_genero")
-  aplicarABookId Int?         @map("aplicar_a_book_id")
-  book           Book?        @relation(fields: [aplicarABookId], references: [id])
+  aplicarAGenero String? @map("aplicar_a_genero")
+  
+  // Puede aplicar a un libro O a un dulce
+  aplicarABookId Int?    @map("aplicar_a_book_id")
+  book           Book?   @relation(fields: [aplicarABookId], references: [id])
+  
+  aplicarADulceId Int?   @map("aplicar_a_dulce_id")
+  dulce           Dulce? @relation(fields: [aplicarADulceId], references: [id])
 
-  createdAt      DateTime     @default(now()) @map("created_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
   @@map("discount_campaigns")
 }
 
-
-
-// --- VENTAS Y CONTABILIDAD ---
+// --- VENTAS ---
 
 model Sale {
-  id          Int           @id @default(autoincrement())
-  fecha       DateTime      @default(now())
-  
-  // Relaciones vitales agregadas
-  sucursalId  Int           @map("sucursal_id") @default(3)
-  sucursal    Sucursal      @relation(fields: [sucursalId], references: [id])
-  userId      Int           @map("user_id") @default(1)
-  user        User          @relation(fields: [userId], references: [id])
-  clienteId   Int?          @map("cliente_id") // Opcional, para cliente registrado
-  
-  // Desglose financiero (Vital para el contador)
-  subtotal    Decimal       @db.Decimal(10, 2) @default(0) // Suma sin impuestos
-  impuestos   Decimal       @db.Decimal(10, 2) @default(0) // IVA total 
-  descuentoTotal Decimal    @default(0) @map("descuento_total") @db.Decimal(10, 2)
-  montoTotal  Decimal       @map("monto_total") @db.Decimal(10, 2) // Lo que paga el cliente
+  id         Int      @id @default(autoincrement())
+  fecha      DateTime @default(now())
+  sucursalId Int      @default(1) @map("sucursal_id")
+  sucursal   Sucursal @relation(fields: [sucursalId], references: [id])
+  userId     Int      @default(1) @map("user_id")
+  user       User     @relation(fields: [userId], references: [id])
+  clienteId  Int?     @map("cliente_id")
 
-  metodoPago  PaymentMethod @default(EFECTIVO) @map("metodo_pago")
-  estado      String        @default("COMPLETADA") // COMPLETADA, CANCELADA, PENDIENTE
-  
-  // Facturación
-  requiereFactura Boolean   @default(false) @map("requiere_factura")
+  subtotal       Decimal @default(0) @db.Decimal(10, 2)
+  impuestos      Decimal @default(0) @db.Decimal(10, 2)
+  descuentoTotal Decimal @default(0) @map("descuento_total") @db.Decimal(10, 2)
+  montoTotal     Decimal @map("monto_total") @db.Decimal(10, 2)
+
+  metodoPago PaymentMethod @default(EFECTIVO) @map("metodo_pago")
+  estado     String        @default("COMPLETADA")
+
+  requiereFactura Boolean  @default(false) @map("requiere_factura")
   datosFactura    Factura?
+  details         SaleDetail[]
 
-  details     SaleDetail[]
-  
-  createdAt   DateTime      @default(now()) @map("created_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
   @@index([fecha])
   @@map("sales")
 }
 
 model SaleDetail {
-  id              Int      @id @default(autoincrement())
-  saleId          Int      @map("sale_id")
-  bookId          Int      @map("book_id")
+  id                Int      @id @default(autoincrement())
+  saleId            Int      @map("sale_id")
+  cantidad_vendida  Int      @map("cantidad_vendida")
+  created_at        DateTime @default(now()) @map("created_at")
   
-  cantidad_vendida Int      @map("cantidad_vendida")
-  created_at     DateTime @default(now()) @map("created_at")
-  precioUnitario  Decimal  @map("precio_unitario") @db.Decimal(10, 2)
+  precioUnitario    Decimal @map("precio_unitario") @db.Decimal(10, 2)
   descuentoAplicado Decimal @default(0) @map("descuento") @db.Decimal(10, 2)
-  impuestoAplicado Decimal @default(0) @map("impuesto_aplicado") @db.Decimal(10, 2) // El monto de IVA de este item
-  subtotal        Decimal  @db.Decimal(10, 2) // (precio - descuento) * cantidad
+  impuestoAplicado  Decimal @default(0) @map("impuesto_aplicado") @db.Decimal(10, 2)
+  subtotal          Decimal @db.Decimal(10, 2)
+
+  // RELACIONES POLIMÓRFICAS (Opcionales, pero una debe existir)
+  bookId Int?  @map("book_id")
+  book   Book? @relation(fields: [bookId], references: [id])
   
-  book            Book     @relation(fields: [bookId], references: [id])
-  sale            Sale     @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  dulceId Int?   @map("dulce_id")
+  dulce   Dulce? @relation(fields: [dulceId], references: [id])
+
+  sale Sale @relation(fields: [saleId], references: [id], onDelete: Cascade)
 
   @@map("sale_details")
 }
 
-// --- NUEVO: CONTROL DE CAJA Y FACTURACIÓN ---
+// --- CAJA Y FACTURACIÓN ---
 
 model CorteCaja {
-  id            Int      @id @default(autoincrement())
-  userId        Int      @map("user_id")
-  sucursalId    Int      @map("sucursal_id")
-  fechaApertura DateTime @default(now()) @map("fecha_apertura")
+  id            Int       @id @default(autoincrement())
+  userId        Int       @map("user_id")
+  sucursalId    Int       @map("sucursal_id")
+  fechaApertura DateTime  @default(now()) @map("fecha_apertura")
   fechaCierre   DateTime? @map("fecha_cierre")
-  
-  montoInicial  Decimal  @map("monto_inicial") @db.Decimal(10, 2) // Fondo de caja
-  ventasSistema Decimal  @default(0) @map("ventas_sistema") @db.Decimal(10, 2) // Calculado
-  montoFinal    Decimal? @map("monto_final") @db.Decimal(10, 2) // Lo que cuenta el cajero
-  diferencia    Decimal? @db.Decimal(10, 2) // Sobrante o faltante
-  
+  montoInicial  Decimal   @map("monto_inicial") @db.Decimal(10, 2)
+  ventasSistema Decimal   @default(0) @map("ventas_sistema") @db.Decimal(10, 2)
+  montoFinal    Decimal?  @map("monto_final") @db.Decimal(10, 2)
+  diferencia    Decimal?  @db.Decimal(10, 2)
   observaciones String?
+  user          User      @relation(fields: [userId], references: [id])
 
-  user          User     @relation(fields: [userId], references: [id])
   @@map("cortes_caja")
 }
 
 model Factura {
-  id          Int      @id @default(autoincrement())
-  saleId      Int      @unique @map("sale_id")
-  rfc         String
-  razonSocial String   @map("razon_social")
-  regimenFiscal String @map("regimen_fiscal") // Ej: "601"
-  usoCfdi     String   @map("uso_cfdi")       // Ej: "G03"
-  uuid        String?  // Folio fiscal del SAT una vez timbrada
-  xmlUrl      String?  // Link al archivo XML
-  pdfUrl      String?  // Link al archivo PDF
-  
-  sale        Sale     @relation(fields: [saleId], references: [id])
+  id            Int     @id @default(autoincrement())
+  saleId        Int     @unique @map("sale_id")
+  rfc           String
+  razonSocial   String  @map("razon_social")
+  regimenFiscal String  @map("regimen_fiscal")
+  usoCfdi       String  @map("uso_cfdi")
+  uuid          String?
+  xmlUrl        String?
+  pdfUrl        String?
+  sale          Sale    @relation(fields: [saleId], references: [id])
+
   @@map("facturas")
 }
 

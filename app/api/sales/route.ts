@@ -3,9 +3,10 @@ import prisma from '@/lib/prisma';
 import { sendWhatsAppReceipt } from '@/lib/whatsapp';
 import { PaymentMethod } from '@prisma/client';
 
-// Definimos los tipos de entrada
+// 1. Modificamos la interfaz para aceptar el TIPO de producto
 interface CartItemPayload {
-  bookId: number; 
+  id: number;          // Ahora es genérico, puede ser bookId o dulceId
+  type: 'BOOK' | 'DULCE'; // 👈 NUEVO: Indispensable para saber dónde buscar
   quantity: number;
 }
 
@@ -22,18 +23,10 @@ export async function POST(request: Request) {
     const body: SaleRequestBody = await request.json();
     const { items, sucursalId, paymentMethod, userId, discountPercent = 0 } = body;
 
-    // 1. Validaciones
-    if (!items || items.length === 0) {
-      return NextResponse.json({ message: 'El carrito está vacío.' }, { status: 400 });
-    }
-    if (!sucursalId) {
-      return NextResponse.json({ message: 'Falta la sucursal ID.' }, { status: 400 });
-    }
+    if (!items || items.length === 0) return NextResponse.json({ message: 'Carrito vacío' }, { status: 400 });
+    if (!sucursalId) return NextResponse.json({ message: 'Falta sucursal ID' }, { status: 400 });
 
-    // 2. Transacción de Base de Datos
-    // Prisma ejecuta todo esto como una unidad. Si algo falla, se deshacen todos los cambios.
     const saleResult = await prisma.$transaction(async (tx) => {
-      
       let saleSubtotal = 0;
       let saleImpuestos = 0;
       let saleTotal = 0;
@@ -42,25 +35,71 @@ export async function POST(request: Request) {
 
       // A) Procesar cada item
       for (const item of items) {
-        const inventoryRecord = await tx.inventario.findUnique({
-          where: {
-            bookId_sucursalId: { bookId: item.bookId, sucursalId: sucursalId }
-          },
-          include: { book: true }
-        });
-
-        if (!inventoryRecord || inventoryRecord.stock < item.quantity) {
-          throw new Error(`Stock insuficiente o producto no encontrado (ID: ${item.bookId})`);
+        
+        // Validaciones básicas
+        if (!item.id || !item.type) {
+            throw new Error(`Item inválido en el carrito (Falta ID o Type)`);
         }
 
-        // Cálculos
         const cantidad = item.quantity;
-        const precioVentaOriginal = Number(inventoryRecord.book.precioVenta);
-        const tasaIva = Number(inventoryRecord.book.tasaIva) || 0; 
+        const sucursalIdNum = Number(sucursalId);
+        const itemIdNum = Number(item.id);
+
+        // Variables para normalizar datos (ya sea Libro o Dulce)
+        let precioVentaOriginal = 0;
+        let tasaIva = 0;
+        let tituloProducto = "";
         
+        // --- LÓGICA DE BIFURCACIÓN (LIBRO vs DULCE) ---
+        
+        if (item.type === 'BOOK') {
+            // 1. Buscar en Inventario de Libros
+            const invRecord = await tx.inventario.findUnique({
+                where: { bookId_sucursalId: { bookId: itemIdNum, sucursalId: sucursalIdNum } },
+                include: { book: true }
+            });
+
+            if (!invRecord) throw new Error(`El libro (ID: ${itemIdNum}) no existe en esta sucursal.`);
+            if (invRecord.stock < cantidad) throw new Error(`Stock insuficiente para libro: ${invRecord.book.titulo}`);
+
+            // Extraer datos
+            precioVentaOriginal = Number(invRecord.book.precioVenta);
+            tasaIva = Number(invRecord.book.tasaIva) || 0;
+            tituloProducto = invRecord.book.titulo;
+
+            // Restar Stock
+            await tx.inventario.update({
+                where: { bookId_sucursalId: { bookId: itemIdNum, sucursalId: sucursalIdNum } },
+                data: { stock: { decrement: cantidad } }
+            });
+
+        } else if (item.type === 'DULCE') {
+            // 2. Buscar en Inventario de Dulces
+            const invRecord = await tx.inventarioDulce.findUnique({
+                where: { dulceId_sucursalId: { dulceId: itemIdNum, sucursalId: sucursalIdNum } },
+                include: { dulce: true } // Relación definida en tu schema
+            });
+
+            if (!invRecord) throw new Error(`El dulce (ID: ${itemIdNum}) no existe en esta sucursal.`);
+            if (invRecord.stock < cantidad) throw new Error(`Stock insuficiente para dulce: ${invRecord.dulce.nombre}`);
+
+            // Extraer datos
+            precioVentaOriginal = Number(invRecord.dulce.precioVenta);
+            tasaIva = Number(invRecord.dulce.tasaIva) || 0;
+            tituloProducto = invRecord.dulce.nombre;
+
+            // Restar Stock
+            await tx.inventarioDulce.update({
+                where: { dulceId_sucursalId: { dulceId: itemIdNum, sucursalId: sucursalIdNum } },
+                data: { stock: { decrement: cantidad } }
+            });
+        } else {
+            throw new Error(`Tipo de producto no soportado: ${item.type}`);
+        }
+
+        // --- CÁLCULOS FINANCIEROS (Comunes para ambos) ---
         const descuentoUnitario = precioVentaOriginal * (discountPercent / 100);
         const precioFinalConDescuento = precioVentaOriginal - descuentoUnitario;
-        
         const precioBaseUnitario = precioFinalConDescuento / (1 + (tasaIva / 100));
         const impuestoUnitario = precioFinalConDescuento - precioBaseUnitario;
 
@@ -74,101 +113,77 @@ export async function POST(request: Request) {
         saleTotal += totalLinea;
         saleDescuentoTotal += descuentoTotalLinea;
 
+        // Preparamos el detalle (Prisma sabe cuál llenar basado en nulls)
         detailData.push({
-          bookId: item.bookId,
-          cantidad: cantidad, 
+          bookId: item.type === 'BOOK' ? itemIdNum : null,   // Si es libro, llenamos este
+          dulceId: item.type === 'DULCE' ? itemIdNum : null, // Si es dulce, llenamos este
+          cantidad_vendida: cantidad, 
           precioUnitario: precioBaseUnitario,
           impuestoAplicado: impuestoLinea,
           subtotal: subtotalLinea,
           descuentoAplicado: descuentoTotalLinea
         });
-
-        // Actualizar Stock
-        await tx.inventario.update({
-          where: { bookId_sucursalId: { bookId: item.bookId, sucursalId: sucursalId } },
-          data: { stock: { decrement: cantidad } }
-        });
       }
 
-      // B) Crear Venta
+      // B) Crear Venta Maestra
       const newSale = await tx.sale.create({
         data: {
-          sucursalId: sucursalId,
+          sucursalId: Number(sucursalId),
           userId: userId || 1, 
           fecha: new Date(),
           metodoPago: paymentMethod, 
-          estado: "COMPLETADA",
           subtotal: saleSubtotal,
           impuestos: saleImpuestos,
           descuentoTotal: saleDescuentoTotal,
           montoTotal: saleTotal,
           details: {
-            create: detailData.map(d => ({
-              bookId: d.bookId,
-              cantidad_vendida: d.cantidad, 
-              precioUnitario: d.precioUnitario,
-              subtotal: d.subtotal,
-              descuentoAplicado: d.descuentoAplicado,
-              impuestoAplicado: d.impuestoAplicado
-            }))
+            create: detailData // Insertamos todos los detalles preparados
           }
         },
         include: {
-          details: { include: { book: true } },
+          details: { 
+            include: { 
+                book: true,  // Traemos libro si existe
+                dulce: true  // Traemos dulce si existe
+            } 
+          },
           sucursal: true
         }
       });
 
-      // --- RESPUESTA A TU DUDA ---
-      // Este 'return' NO termina la función POST.
-      // Solo termina la transacción y le entrega el valor 'newSale' a la variable 'const saleResult'.
       return newSale; 
     });
 
-    // 3. Notificación WhatsApp (Se ejecuta DESPUÉS de que la transacción fue exitosa)
-    // --- DEBUG LOGS: Rastrear por qué no envía ---
-    console.log(`🔔 [DEBUG] Iniciando intento de notificación para Venta #${saleResult.id}`);
-    
+    // 3. Notificación WhatsApp (Actualizada para Dulces)
     try {
         const userIdToFind = userId || 1;
-        console.log(`🔍 [DEBUG] Buscando vendedor ID: ${userIdToFind}`);
-
-        const vendedor = await prisma.user.findUnique({
-            where: { id: userIdToFind }, 
-            select: { nombre: true }
+        const vendedor = await prisma.user.findUnique({ where: { id: userIdToFind }, select: { nombre: true } });
+        
+        // Mapeo inteligente para el recibo
+        const itemsReceipt = saleResult.details.map((d) => {
+            // Determinamos el nombre dependiendo de qué relación exista
+            const nombreProducto = d.book?.titulo || d.dulce?.nombre || "Producto desconocido";
+            
+            return {
+                titulo: nombreProducto,
+                quantity: d.cantidad_vendida,
+                precio: (Number(d.subtotal) + Number(d.impuestoAplicado)) / d.cantidad_vendida
+            };
         });
-        const nombreVendedor = vendedor?.nombre || "Cajero Genérico";
-        console.log(`👤 [DEBUG] Vendedor identificado: ${nombreVendedor}`);
-
-        // Preparamos los datos limpios para el recibo
-        const itemsReceipt = saleResult.details.map((d) => ({
-            titulo: d.book.titulo,
-            quantity: d.cantidad_vendida,
-            // Reconstruimos el precio visual (con impuestos) para el cliente
-            precio: (Number(d.subtotal) + Number(d.impuestoAplicado)) / d.cantidad_vendida
-        }));
-
-        console.log(`📦 [DEBUG] Items a enviar: ${itemsReceipt.length} productos.`);
-        console.log(`📲 [DEBUG] Llamando a sendWhatsAppReceipt...`);
 
         await sendWhatsAppReceipt({
             saleId: saleResult.id,
-            userName: nombreVendedor,
-            sucursalName: saleResult.sucursal.nombre, // Usamos el dato que devolvió la transacción
+            userName: vendedor?.nombre || "Cajero",
+            sucursalName: saleResult.sucursal.nombre,
             items: itemsReceipt,
             totalAmount: Number(saleResult.montoTotal),
-            paymentMethod: paymentMethod, // ✅ Aquí pasamos el método que recibimos al inicio
+            paymentMethod: paymentMethod,
         });
 
-        console.log(`✅ [DEBUG] ¡WhatsApp enviado exitosamente!`);
-
     } catch (waError) {
-        // Si falla WhatsApp, solo lo registramos en consola, pero NO fallamos la venta
-        // porque el dinero ya se cobró y la venta ya se guardó en la DB.
-        console.error("❌ [DEBUG] Error CRÍTICO en notificación WhatsApp:", waError);
+        console.error("Error en WhatsApp (no crítico):", waError);
     }
 
-    // 4. Respuesta Final al Cliente
     return NextResponse.json({ 
       message: "Venta registrada correctamente", 
       saleId: saleResult.id,

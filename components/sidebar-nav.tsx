@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { BookOpen, ShoppingCart, Package, BarChart3, Book } from "lucide-react"
+import { BookOpen, ShoppingCart, Package, BarChart3, Book, Candy } from "lucide-react"
 
 const links = [
   {
@@ -19,6 +19,11 @@ const links = [
     href: "/dashboard",
     title: "Panel de Control",
     icon: BarChart3
+  },
+  {
+    href: "/dulceria",
+    title: "Dulcería",
+    icon: Candy
   },
   {
     href: "/pending",

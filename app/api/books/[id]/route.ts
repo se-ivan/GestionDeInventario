@@ -1,11 +1,19 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 
-// La función recibe el objeto `request` y el contexto que contiene `params`.
-export async function PUT(request: Request, { params }: { params: { id: string } }) {
+// 1. CAMBIO: Definimos params como una Promesa
+export async function PUT(
+  request: Request, 
+  { params }: { params: Promise<{ id: string }> } 
+) {
   try {
     const body = await request.json();
-    const bookId = Number(params.id);
+
+    // 2. CAMBIO: Esperamos a que params se resuelva antes de usarlo
+    const { id } = await params; 
+
+    // 3. CAMBIO: Usamos la variable 'id' que acabamos de obtener
+    const bookId = Number(id);
 
     if (isNaN(bookId)) {
       return NextResponse.json({ error: "El ID del libro no es válido" }, { status: 400 });
@@ -18,9 +26,8 @@ export async function PUT(request: Request, { params }: { params: { id: string }
       data: {
         titulo: body.titulo,
         autor: body.autor,
-        precio: body.precio,
+        precioVenta: body.precio, 
         isbn: body.isbn,
-        // AÑADIDO: Nuevos campos para la actualización
         editorial: body.editorial,
         coleccion: body.coleccion,
         anioPublicacion: body.anioPublicacion,
@@ -33,7 +40,6 @@ export async function PUT(request: Request, { params }: { params: { id: string }
   } catch (error: any) {
     console.error('Error al actualizar el libro:', error);
 
-    // Error específico de Prisma cuando no se encuentra el registro a actualizar.
     if (error.code === 'P2025') {
       return NextResponse.json(
         { error: 'El libro a actualizar no fue encontrado.' },
@@ -41,7 +47,6 @@ export async function PUT(request: Request, { params }: { params: { id: string }
       );
     }
 
-    // Error genérico para cualquier otro fallo.
     return NextResponse.json(
       { message: 'Error en el servidor al actualizar el libro' },
       { status: 500 }
