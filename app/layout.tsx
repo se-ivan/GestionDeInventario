@@ -4,6 +4,8 @@ import { GeistMono } from "geist/font/mono"
 import { Analytics } from "@vercel/analytics/next"
 import { Suspense } from "react"
 import { SidebarNav } from "@/components/sidebar-nav"
+import { ClerkProvider } from '@clerk/nextjs'
+import { esMX } from '@clerk/localizations'
 import "./globals.css"
 
 export const metadata: Metadata = {
@@ -29,6 +31,9 @@ export default function RootLayout({
 }>) {
 
   return (
+    <ClerkProvider
+      localization={esMX}> {/* <-- Añadido para localización en español */}
+      
     <html lang="es"> {/* <-- Cambiado a "es" por consistencia */}
       <body className={`font-sans ${GeistSans.variable} ${GeistMono.variable}`}>
         <div className="flex h-screen">
@@ -42,5 +47,6 @@ export default function RootLayout({
         <Analytics />
       </body>
     </html>
+    </ClerkProvider>
   )
 }
