@@ -83,7 +83,9 @@ model Book {
   anioPublicacion Int?        @map("anio_publicacion")
   genero          String?
   coleccion       String?
-  
+
+  deletedAt       DateTime? @map("deleted_at")
+
   inventario  Inventario[]
   saleDetails SaleDetail[]
   discounts   DiscountCampaign[]
@@ -91,6 +93,7 @@ model Book {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
+  @@index([deletedAt])
   @@index([titulo])
   @@index([isbn])
   @@map("books")
@@ -115,10 +118,12 @@ model Dulce {
   inventario  InventarioDulce[]
   saleDetails SaleDetail[]
   discounts   DiscountCampaign[]
+  deletedAt     DateTime? @map("deleted_at")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
-
+  
+  @@index([deletedAt])
   @@index([nombre])
   @@index([codigoBarras])
   @@map("dulces")

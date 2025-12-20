@@ -1,34 +1,32 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 
-// GET: Obtener lista de dulces
+// GET: Obtener dulces ACTIVOS
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const query = searchParams.get('q');
 
-    const whereClause = query
-      ? {
-          OR: [
-            { nombre: { contains: query, mode: 'insensitive' as const } },
-            { marca: { contains: query, mode: 'insensitive' as const } },
-            { codigoBarras: { contains: query } },
-          ],
-        }
-      : {};
+    const whereClause: any = {
+      deletedAt: null, // 👈 FILTRO CLAVE
+    };
+
+    if (query) {
+      whereClause.OR = [
+        { nombre: { contains: query, mode: 'insensitive' } },
+        { marca: { contains: query, mode: 'insensitive' } },
+        { codigoBarras: { contains: query } },
+      ];
+    }
 
     const dulces = await prisma.dulce.findMany({
       where: whereClause,
       include: {
         inventario: {
-          include: {
-            sucursal: true,
-          },
+          include: { sucursal: true },
         },
       },
-      orderBy: {
-        createdAt: 'desc',
-      },
+      orderBy: { createdAt: 'desc' },
     });
     return NextResponse.json(dulces);
   } catch (error) {
@@ -37,7 +35,7 @@ export async function GET(request: Request) {
   }
 }
 
-// POST: Crear nuevo dulce
+// POST: Crear O Reactivar Dulce
 export async function POST(request: Request) {
   try {
     const body = await request.json();
@@ -46,10 +44,67 @@ export async function POST(request: Request) {
         return NextResponse.json({ message: 'Faltan campos obligatorios' }, { status: 400 });
     }
 
+    const codigoBarras = body.codigoBarras || null;
+
+    // --- LÓGICA DE REACTIVACIÓN ---
+    if (codigoBarras) {
+        // 1. Buscar coincidencia global
+        const existingDulce = await prisma.dulce.findUnique({
+            where: { codigoBarras: codigoBarras }
+        });
+
+        if (existingDulce) {
+            // A. Duplicado real (Activo)
+            if (!existingDulce.deletedAt) {
+                return NextResponse.json({ message: 'El código de barras ya existe en un producto activo.' }, { status: 409 });
+            }
+
+            // B. Reactivar (Estaba borrado)
+            const reactivatedDulce = await prisma.dulce.update({
+                where: { id: existingDulce.id },
+                data: {
+                    deletedAt: null, // 👈 Reactivar
+                    nombre: body.nombre,
+                    marca: body.marca,
+                    lineaProducto: body.lineaProducto,
+                    peso: body.peso,
+                    sabor: body.sabor,
+                    precioVenta: body.precioVenta,
+                    precioCompra: body.precioCompra || 0,
+                    tasaIva: body.tasaIva || 0,
+                    // Actualizar inventario de la sucursal
+                    inventario: {
+                        upsert: {
+                            where: {
+                                dulceId_sucursalId: {
+                                    dulceId: existingDulce.id,
+                                    sucursalId: Number(body.sucursalId)
+                                }
+                            },
+                            update: {
+                                stock: Number(body.stock),
+                                minStock: Number(body.minStock) || 10,
+                                ubicacion: body.ubicacion
+                            },
+                            create: {
+                                sucursalId: Number(body.sucursalId),
+                                stock: Number(body.stock),
+                                minStock: Number(body.minStock) || 10,
+                                ubicacion: body.ubicacion
+                            }
+                        }
+                    }
+                }
+            });
+            return NextResponse.json(reactivatedDulce, { status: 201 }); // 201 Created/Recovered
+        }
+    }
+
+    // --- CREACIÓN NORMAL ---
     const newDulce = await prisma.dulce.create({
       data: {
         nombre: body.nombre,
-        codigoBarras: body.codigoBarras || null,
+        codigoBarras: codigoBarras,
         marca: body.marca,
         lineaProducto: body.lineaProducto,
         peso: body.peso,
@@ -71,23 +126,24 @@ export async function POST(request: Request) {
     return NextResponse.json(newDulce, { status: 201 });
   } catch (error: any) {
     console.error("Error al crear dulce:", error);
+    // Por si acaso fallara algo más
     if (error.code === 'P2002') return NextResponse.json({ message: 'El código de barras ya existe.' }, { status: 409 });
     return NextResponse.json({ message: 'Error interno al crear el producto' }, { status: 500 });
   }
 }
 
-// PUT: Actualizar un dulce existente (con soporte para inventario)
+// PUT: Actualizar (Igual que antes, solo aseguramos que el update no toque el deletedAt)
 export async function PUT(request: Request) {
   try {
     const body = await request.json();
     const { id, sucursalId, stock, ...data } = body;
 
-    if (!id) return NextResponse.json({ message: 'ID requerido para actualizar' }, { status: 400 });
+    if (!id) return NextResponse.json({ message: 'ID requerido' }, { status: 400 });
 
-    // 1. Actualizar datos básicos del dulce
     const updatedDulce = await prisma.dulce.update({
       where: { id: Number(id) },
       data: {
+        // ... (resto de campos igual) ...
         nombre: data.nombre,
         codigoBarras: data.codigoBarras || null,
         marca: data.marca,
@@ -100,7 +156,6 @@ export async function PUT(request: Request) {
       },
     });
 
-    // 2. ✅ Actualizar Inventario si se proporcionan datos de stock
     if (sucursalId !== undefined && stock !== undefined) {
       await prisma.inventarioDulce.upsert({
         where: {
@@ -126,12 +181,11 @@ export async function PUT(request: Request) {
 
     return NextResponse.json(updatedDulce);
   } catch (error) {
-    console.error("Error al actualizar dulce:", error);
     return NextResponse.json({ message: 'Error al actualizar' }, { status: 500 });
   }
 }
 
-// DELETE: Eliminar un dulce
+// DELETE: Eliminación Lógica (Soft Delete)
 export async function DELETE(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
@@ -139,8 +193,12 @@ export async function DELETE(request: Request) {
 
     if (!id) return NextResponse.json({ message: 'ID requerido' }, { status: 400 });
 
-    await prisma.dulce.delete({
+    // CAMBIO IMPORTANTE: UPDATE EN VEZ DE DELETE
+    await prisma.dulce.update({
       where: { id: Number(id) },
+      data: { 
+          deletedAt: new Date() // Marcamos la fecha de eliminación
+      } 
     });
 
     return NextResponse.json({ message: 'Producto eliminado correctamente' });
