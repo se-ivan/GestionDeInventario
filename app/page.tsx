@@ -101,6 +101,19 @@ export default function PointOfSale() {
     setDiscountPercent(value);
   };
 
+
+  const handleDownload = () => {
+    // 1. Obtenemos la fecha LOCAL del usuario
+    const today = new Date();
+    
+    // Truco: 'en-CA' formatea automáticamente como YYYY-MM-DD usando la zona horaria local
+    const localDate = today.toLocaleDateString('en-CA'); 
+    
+    // 2. Enviamos la fecha explícita a la API
+    // Ejemplo de URL generada: /api/cron/report?date=2023-10-27
+    window.open(`/api/reporte?date=${localDate}`, '_blank');
+  };
+
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!searchTerm.trim() || !selectedSucursal) return
@@ -283,7 +296,7 @@ export default function PointOfSale() {
             </p>
             <Button
               onClick={() => {
-                window.open('/api/reporte/', '_blank');
+                handleDownload()
               }}
             >
               Descargar Corte del Día

@@ -46,18 +46,36 @@ export async function GET(request: Request) {
 
     try {
         // 1. CONFIGURAR RANGO DE FECHAS (Todo el día: 00:00:00 a 23:59:59)
-        let baseDate = dateParam ? new Date(dateParam) : new Date();
+        let startDate: Date;
+        let endDate: Date;
 
-        // Validar fecha invalida
-        if (isNaN(baseDate.getTime())) baseDate = new Date();
+        if (dateParam) {
+            // SOLUCIÓN: Desarmamos la fecha "2025-12-20" para evitar la conversión automática a UTC
+            // dateParam viene como string "YYYY-MM-DD"
+            const [year, month, day] = dateParam.split('-').map(Number);
 
-        const startDate = new Date(baseDate);
-        startDate.setHours(0, 0, 0, 0);
+            // Creamos la fecha usando el constructor (Año, Mes-1, Día)
+            // NOTA: Javascript cuenta los meses del 0 al 11, por eso restamos 1 al mes.
+            // Al usar este constructor, Javascript usa la zona horaria DEL SISTEMA (Tu PC)
+            const baseDate = new Date(year, month - 1, day);
 
-        const endDate = new Date(baseDate);
-        endDate.setHours(23, 59, 59, 999);
+            startDate = new Date(baseDate);
+            startDate.setHours(0, 0, 0, 0);
 
-        console.log(`Generando reporte para: ${startDate.toLocaleString()} a ${endDate.toLocaleString()}`);
+            endDate = new Date(baseDate);
+            endDate.setHours(23, 59, 59, 999);
+
+        } else {
+            // Si no hay fecha, usamos "ahora"
+            const now = new Date();
+            startDate = new Date(now);
+            startDate.setHours(0, 0, 0, 0);
+
+            endDate = new Date(now);
+            endDate.setHours(23, 59, 59, 999);
+        }
+
+        console.log(`Generando reporte (Local): ${startDate.toString()} a ${endDate.toString()}`);
 
         // 2. CONSULTA A BASE DE DATOS
         const ventas = await prisma.sale.findMany({
