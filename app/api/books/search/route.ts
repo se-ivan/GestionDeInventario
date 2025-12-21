@@ -1,44 +1,36 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { useState } from "react"
 import prisma from "@/lib/prisma"
 
-const fetchBooks = async () => {
-  try {
-    const response = await fetch("/api/books")
-    if (response.ok) {
-      const booksData = await response.json()
-      prisma.book.createMany({ data: booksData })
-    }
-  } catch (error) {
-    console.error("Error fetching books:", error)
-  }
-}
-
-// GET /api/books/search?q=query - Search books
+// ✅ CORRECTO: Función asíncrona estándar de Next.js API
 export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams
-    const query = searchParams.get("q")
+    const query = searchParams.get('q')
 
     if (!query) {
-      return NextResponse.json({ error: "Search query is required" }, { status: 400 })
+      return NextResponse.json({ message: 'Falta el término de búsqueda' }, { status: 400 })
     }
 
-    const searchTerm = query.toLowerCase()
-    const filteredBooks = await prisma.book.findMany({
+    // Lógica de búsqueda
+    const books = await prisma.book.findMany({
       where: {
+        deletedAt: null, // Solo activos
         OR: [
-          { titulo: { contains: searchTerm, mode: 'insensitive' } }, 
-          { autor: { contains: searchTerm, mode: 'insensitive' } },  
-          { isbn: { contains: searchTerm, mode: 'insensitive' } },  
-        ],
+          { isbn: { contains: query } },
+          { titulo: { contains: query, mode: 'insensitive' } },
+          { autor: { contains: query, mode: 'insensitive' } },  
+        ]
       },
-    });
-    console.log(searchTerm)
-    console.log(filteredBooks)
-    return NextResponse.json(filteredBooks)
+      include: {
+        inventario: true
+      },
+      take: 10 // Limitar resultados para no saturar
+    })
+
+    return NextResponse.json(books)
+    
   } catch (error) {
-    console.error("Error searching books:", error)
-    return NextResponse.json({ error: "Failed to search books" }, { status: 500 })
+    console.error("Error en búsqueda:", error)
+    return NextResponse.json({ message: 'Error interno' }, { status: 500 })
   }
 }

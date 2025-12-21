@@ -1,14 +1,15 @@
 import { NextResponse } from 'next/server';
-import prisma from '@/lib/prisma';
+import prisma from '@/lib/prisma'; // Asegúrate que esta ruta a tu instancia de prisma sea correcta
 
-// GET: Obtener libros ACTIVOS con su inventario
+// --- GET: Buscar libros (Solo activos) ---
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const query = searchParams.get('q');
 
+    // Filtro base: Solo traer los que NO tienen fecha de borrado
     const whereClause: any = {
-      deletedAt: null, // 👈 FILTRO CLAVE: Solo traer los no borrados
+      deletedAt: null, 
     };
 
     if (query) {
@@ -27,89 +28,101 @@ export async function GET(request: Request) {
         },
       },
       orderBy: { createdAt: 'desc' },
+      take: 50, // Limite para no saturar si no hay búsqueda
     });
+
     return NextResponse.json(books);
   } catch (error) {
-    console.error("Error al obtener los libros:", error);
-    return NextResponse.json({ message: 'Error al obtener los libros' }, { status: 500 });
+    console.error("Error al obtener libros:", error);
+    return NextResponse.json({ message: 'Error interno del servidor' }, { status: 500 });
   }
 }
 
-// POST: Crear nuevo libro O Reactivar uno eliminado
+// --- POST: Crear Libro O Agregar Stock si ya existe ---
 export async function POST(request: Request) {
   try {
     const body = await request.json();
     const { bookData, inventoryData } = body;
 
+    // 1. Validaciones básicas
     if (!bookData || !inventoryData) {
         return NextResponse.json({ message: 'Datos incompletos' }, { status: 400 });
     }
+    
+    // Normalizar ISBN
+    const isbn = bookData.isbn && bookData.isbn.trim() !== "" ? bookData.isbn.trim() : null;
 
-    const finalIsbn = bookData.isbn && bookData.isbn.trim() !== "" ? bookData.isbn.trim() : null;
-
-    // --- LÓGICA DE REACTIVACIÓN ---
-    if (finalIsbn) {
-      // 1. Buscamos si existe algun libro con ese ISBN (borrado o no)
-      const existingBook = await prisma.book.findUnique({
-        where: { isbn: finalIsbn }
-      });
-
-      if (existingBook) {
-        // A. Si existe y NO tiene fecha de borrado, es un duplicado real.
-        if (!existingBook.deletedAt) {
-          return NextResponse.json({ message: 'Ya existe un libro activo con este ISBN.' }, { status: 409 });
-        }
-
-        // B. Si existe pero TIENE fecha de borrado, lo REACTIVAMOS.
-        const reactivatedBook = await prisma.book.update({
-          where: { id: existingBook.id },
-          data: {
-            deletedAt: null, // 👈 ¡Resurrección!
-            titulo: bookData.titulo,
-            autor: bookData.autor,
-            editorial: bookData.editorial,
-            coleccion: bookData.coleccion,
-            anioPublicacion: bookData.anioPublicacion,
-            genero: bookData.genero,
-            precioVenta: bookData.precioVenta,
-            precioCompra: bookData.precioCompra,
-            tasaIva: bookData.tasaIva,
-            // Actualizamos o creamos el inventario para la sucursal actual
-            inventario: {
-              upsert: {
-                where: {
-                  bookId_sucursalId: {
-                    bookId: existingBook.id,
-                    sucursalId: inventoryData.sucursalId
-                  }
-                },
-                update: {
-                  stock: inventoryData.stock,
-                  minStock: inventoryData.minStock,
-                  ubicacion: inventoryData.ubicacion
-                },
-                create: {
-                  sucursalId: inventoryData.sucursalId,
-                  stock: inventoryData.stock,
-                  minStock: inventoryData.minStock,
-                  ubicacion: inventoryData.ubicacion
-                }
-              }
-            }
-          },
-          include: { inventario: true }
+    // 2. VERIFICAR EXISTENCIA GLOBAL (Buscamos por ISBN si existe)
+    let existingBook = null;
+    
+    if (isbn) {
+        existingBook = await prisma.book.findUnique({
+            where: { isbn: isbn },
+            include: { inventario: true }
         });
-        
-        return NextResponse.json(reactivatedBook);
-      }
     }
 
-    // --- CREACIÓN NORMAL (Si no existía) ---
+    // --- ESCENARIO A: EL LIBRO YA EXISTE (Activo o Borrado) ---
+    if (existingBook) {
+        // Si estaba eliminado (Soft Delete), lo reactivamos quitando el deletedAt
+        // Si estaba activo, simplemente actualizamos datos por si cambiaron (opcional)
+        
+        const updatedBook = await prisma.book.update({
+            where: { id: existingBook.id },
+            data: {
+                deletedAt: null, // ¡Resurrección!
+                // Actualizamos datos básicos por si corrigieron algo
+                titulo: bookData.titulo,
+                autor: bookData.autor,
+                editorial: bookData.editorial,
+                precioVenta: bookData.precioVenta,
+                
+                // LÓGICA DE INVENTARIO (UPSERT)
+                // Buscamos si ya existe registro en ESTA sucursal para sumar o crear
+                inventario: {
+                    upsert: {
+                        where: {
+                            // Prisma crea este ID compuesto automáticamente en la relación N:M
+                            bookId_sucursalId: {
+                                bookId: existingBook.id,
+                                sucursalId: Number(inventoryData.sucursalId)
+                            }
+                        },
+                        update: {
+                            // Si ya existe en esta sucursal, SUMAMOS al stock actual
+                            // Nota: Prisma permite operaciones atómicas como 'increment', pero
+                            // aquí calculamos manual para tener control o reescribimos el valor.
+                            // Para seguridad simple, reemplazamos o incrementamos:
+                            stock: { increment: Number(inventoryData.stock) },
+                            ubicacion: inventoryData.ubicacion,
+                            minStock: Number(inventoryData.minStock)
+                        },
+                        create: {
+                            // Si no existe en esta sucursal, lo creamos
+                            sucursalId: Number(inventoryData.sucursalId),
+                            stock: Number(inventoryData.stock),
+                            minStock: Number(inventoryData.minStock) || 5,
+                            ubicacion: inventoryData.ubicacion
+                        }
+                    }
+                }
+            },
+            include: { inventario: true }
+        });
+
+        return NextResponse.json({
+            message: 'El libro ya existía. Se ha actualizado el inventario correctamente.',
+            book: updatedBook,
+            type: 'UPDATE' // Para que el front sepa que no fue creación nueva
+        }, { status: 200 });
+    }
+
+    // --- ESCENARIO B: EL LIBRO ES NUEVO ---
     const newBook = await prisma.book.create({
       data: {
         titulo: bookData.titulo,
         autor: bookData.autor,
-        isbn: finalIsbn,
+        isbn: isbn,
         editorial: bookData.editorial,
         coleccion: bookData.coleccion,
         anioPublicacion: bookData.anioPublicacion,
@@ -119,9 +132,9 @@ export async function POST(request: Request) {
         tasaIva: bookData.tasaIva,
         inventario: {
           create: {
-            sucursalId: inventoryData.sucursalId,
-            stock: inventoryData.stock,
-            minStock: inventoryData.minStock,
+            sucursalId: Number(inventoryData.sucursalId),
+            stock: Number(inventoryData.stock),
+            minStock: Number(inventoryData.minStock) || 5,
             ubicacion: inventoryData.ubicacion
           },
         },
@@ -129,28 +142,34 @@ export async function POST(request: Request) {
       include: { inventario: { include: { sucursal: true } } }
     });
 
-    return NextResponse.json(newBook);
+    return NextResponse.json(newBook, { status: 201 });
+
   } catch (error: any) {
-    console.error("Error al crear el libro:", error);
-    // Errores genéricos...
+    console.error("Error en POST book:", error);
+    // Manejo de error de duplicado por si acaso falló la lógica anterior
+    if (error.code === 'P2002') {
+        return NextResponse.json({ message: 'Conflicto de integridad: El ISBN ya existe.' }, { status: 409 });
+    }
     return NextResponse.json({ message: 'Error interno al procesar el libro' }, { status: 500 });
   }
 }
 
-// DELETE (Faltaba en tu código de libros, agregamos el Soft Delete)
+// --- DELETE: Soft Delete ---
 export async function DELETE(request: Request) {
     try {
         const { searchParams } = new URL(request.url);
         const id = searchParams.get('id');
+
         if (!id) return NextResponse.json({ message: 'ID requerido' }, { status: 400 });
 
         await prisma.book.update({
             where: { id: Number(id) },
-            data: { deletedAt: new Date() } // 👈 Soft Delete
+            data: { deletedAt: new Date() } // Marcamos como borrado
         });
 
         return NextResponse.json({ message: 'Libro eliminado correctamente' });
     } catch (error) {
+        console.error(error);
         return NextResponse.json({ message: 'Error al eliminar' }, { status: 500 });
     }
 }
