@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { BookForm } from "@/components/book-form"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-import { Package, Plus, Search, AlertTriangle, Edit, Trash2 } from "lucide-react"
+import { Package, Plus, Search, AlertTriangle, Edit, Trash2, FileDown } from "lucide-react"
 import { SucursalForm } from "@/components/sucursal-form"
 import { Book, Sucursal, InventarioEntry, BookFormData } from "@/lib/types"
 
@@ -14,12 +14,12 @@ export default function InventoryPage() {
   const [inventory, setInventory] = useState<InventarioEntry[]>([])
   const [filteredInventory, setFilteredInventory] = useState<InventarioEntry[]>([])
   const [searchQuery, setSearchQuery] = useState("")
-  
+
   // Dialogs
   const [isAddBookDialogOpen, setIsAddBookDialogOpen] = useState(false);
   const [isAddSucursalDialogOpen, setIsAddSucursalDialogOpen] = useState(false);
   const [editingEntry, setEditingEntry] = useState<InventarioEntry | null>(null)
-  
+
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
@@ -55,7 +55,7 @@ export default function InventoryPage() {
       setIsLoading(false);
     }
   };
-  
+
   const fetchSucursales = async () => {
     try {
       const res = await fetch('/api/sucursales');
@@ -70,14 +70,14 @@ export default function InventoryPage() {
 
   const handleAddSucursal = async (data: { nombre: string; direccion?: string }) => {
     try {
-      const response = await fetch('/api/sucursales', { 
-        method: 'POST', 
-        headers: { 'Content-Type': 'application/json' }, 
-        body: JSON.stringify(data) 
+      const response = await fetch('/api/sucursales', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
       });
-      
+
       if (!response.ok) throw new Error("Error al crear sucursal");
-      
+
       fetchSucursales();
       setIsAddSucursalDialogOpen(false);
     } catch (error) {
@@ -89,17 +89,17 @@ export default function InventoryPage() {
   // --- AQUÍ ESTÁ EL CAMBIO IMPORTANTE PARA EL ISBN ---
   const handleAddBook = async (data: BookFormData) => {
     // 1. Eliminamos el try/catch envolvente para permitir que el error suba
-    const response = await fetch('/api/books', { 
-        method: 'POST', 
-        headers: { 'Content-Type': 'application/json' }, 
-        body: JSON.stringify(data) 
+    const response = await fetch('/api/books', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
     });
 
     // 2. Si el backend dice error (ej. 409 Conflict), lanzamos el error
     if (!response.ok) {
-        const errorData = await response.json();
-        // Esto le manda el mensaje "Ya existe un libro con este ISBN" al BookForm
-        throw new Error(errorData.message || "Error al crear el libro");
+      const errorData = await response.json();
+      // Esto le manda el mensaje "Ya existe un libro con este ISBN" al BookForm
+      throw new Error(errorData.message || "Error al crear el libro");
     }
 
     // 3. Solo si todo sale bien, actualizamos la tabla y cerramos
@@ -110,28 +110,28 @@ export default function InventoryPage() {
   const handleUpdateEntry = async (data: { bookData: Partial<Book>, inventoryData: { bookId: number, sucursalId: number, stock: number } }) => {
     // Paso 1: Actualizar datos del libro
     const resBook = await fetch(`/api/books/${data.inventoryData.bookId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data.bookData),
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data.bookData),
     });
 
     if (!resBook.ok) {
-        const err = await resBook.json();
-        throw new Error(err.message || "Error al actualizar el libro");
+      const err = await resBook.json();
+      throw new Error(err.message || "Error al actualizar el libro");
     }
 
     // Paso 2: Actualizar datos de inventario
     const resInv = await fetch(`/api/inventario`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data.inventoryData),
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data.inventoryData),
     });
 
     if (!resInv.ok) {
-        const err = await resInv.json();
-        throw new Error(err.message || "Error al actualizar inventario");
+      const err = await resInv.json();
+      throw new Error(err.message || "Error al actualizar inventario");
     }
-      
+
     // Éxito
     setEditingEntry(null);
     await fetchInventory();
@@ -166,7 +166,19 @@ export default function InventoryPage() {
       console.error("Error deleting entry:", error);
     }
   };
-  
+
+  const [loading, setLoading] = useState(false);
+
+  const handleDownload = () => {
+    setLoading(true);
+    // Usamos window.open para forzar la descarga directa del stream de la API
+    // Se abrirá brevemente una pestaña y se cerrará al descargar
+    window.open('/api/export/inventory', '_blank');
+
+    // Reseteamos el loading después de un momento (ya que no podemos saber cuándo termina la descarga con window.open)
+    setTimeout(() => setLoading(false), 2000);
+  };
+
   const stats = [
     {
       title: "Registros de Inventario",
@@ -205,8 +217,18 @@ export default function InventoryPage() {
             <p className="text-slate-500 mt-1 pr-3">Administra el stock de libros en todas tus sucursales.</p>
           </div>
           <div className="flex gap-4 md:flex-row flex-col">
+            <Button
+              onClick={handleDownload}
+              variant="outline"
+              disabled={loading}
+              className="gap-2 border-green-600 text-green-700 hover:bg-green-50"
+            >
+              <FileDown className="h-4 w-4" />
+              {loading ? "Generando..." : "Descargar Inventario Global"}
+            </Button>
             <Dialog open={isAddSucursalDialogOpen} onOpenChange={setIsAddSucursalDialogOpen}><DialogTrigger asChild><Button><Plus className="h-5 w-5 mr-2" />Agregar Sucursal</Button></DialogTrigger><DialogContent className="max-w-2xl"><DialogHeader><DialogTitle>Agregar Nueva Sucursal</DialogTitle></DialogHeader><SucursalForm onSubmit={handleAddSucursal} onCancel={() => setIsAddSucursalDialogOpen(false)} /></DialogContent></Dialog>
-            <Dialog open={isAddBookDialogOpen} onOpenChange={setIsAddBookDialogOpen}><DialogTrigger asChild><Button><Plus className="h-5 w-5 mr-2" />Agregar Libro</Button></DialogTrigger><DialogContent className="max-w-2xl"><DialogHeader><DialogTitle>Agregar Nuevo Libro</DialogTitle></DialogHeader><BookForm onSubmit={handleAddBook} onCancel={() => setIsAddBookDialogOpen(false)} sucursales={sucursales} onTransfer={async () => {}} /></DialogContent></Dialog>
+            <Dialog open={isAddBookDialogOpen} onOpenChange={setIsAddBookDialogOpen}><DialogTrigger asChild><Button><Plus className="h-5 w-5 mr-2" />Agregar Libro</Button></DialogTrigger><DialogContent className="max-w-2xl"><DialogHeader><DialogTitle>Agregar Nuevo Libro</DialogTitle></DialogHeader><BookForm onSubmit={handleAddBook} onCancel={() => setIsAddBookDialogOpen(false)} sucursales={sucursales} onTransfer={async () => { }} /></DialogContent></Dialog>
+            
           </div>
         </header>
 

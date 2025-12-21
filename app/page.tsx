@@ -89,10 +89,10 @@ export default function PointOfSale() {
 
   const handleDiscountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     let value = parseFloat(e.target.value);
-    
+
     if (isNaN(value)) {
-        setDiscountPercent(0);
-        return;
+      setDiscountPercent(0);
+      return;
     }
 
     if (value > 100) value = 100;
@@ -211,7 +211,7 @@ export default function PointOfSale() {
         items: cartItems.map(item => ({
           id: item.id,
           // TypeScript agradecerá que asegures que el tipo es string literal
-          type: item.type, 
+          type: item.type,
           quantity: item.quantity
         }))
       };
@@ -226,7 +226,7 @@ export default function PointOfSale() {
 
       if (res.ok) {
         setLastSale({ id: data.saleId, total: Number(data.total) });
-        
+
         // Limpiar estado post-venta
         setCartItems([]);
         setSearchResults([]);
@@ -276,11 +276,18 @@ export default function PointOfSale() {
       {/* IZQUIERDA: PRODUCTOS */}
       <main className="flex-1 flex flex-col p-6 gap-6 overflow-hidden">
         <div className="flex justify-between items-center bg-white p-4 rounded-xl shadow-sm">
-          <div>
+          <div className="flex flex-col gap-3">
             <h1 className="text-2xl font-bold text-slate-800">Punto de Venta</h1>
             <p className="text-sm text-slate-500">
               {selectedSucursal ? `Sucursal: ${sucursales.find(s => s.id === selectedSucursal)?.nombre}` : "Seleccione sucursal"}
             </p>
+            <Button
+              onClick={() => {
+                window.open('/api/reporte/', '_blank');
+              }}
+            >
+              Descargar Corte del Día
+            </Button>
           </div>
           <div className="flex items-center gap-3">
             <Store className="text-slate-400" />
@@ -459,8 +466,8 @@ export default function PointOfSale() {
                   key={method.id}
                   onClick={() => setPaymentMethod(method.id)}
                   className={`text-xs py-2.5 px-1 rounded-lg border transition-all font-medium ${paymentMethod === method.id
-                      ? "bg-slate-800 border-slate-800 text-white shadow-md transform scale-[1.02]"
-                      : "bg-white border-slate-200 text-slate-600 hover:border-slate-300 hover:bg-slate-50"
+                    ? "bg-slate-800 border-slate-800 text-white shadow-md transform scale-[1.02]"
+                    : "bg-white border-slate-200 text-slate-600 hover:border-slate-300 hover:bg-slate-50"
                     }`}
                 >
                   {method.label}
