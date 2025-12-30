@@ -1,10 +1,6 @@
-// File: app/api/cron/report/route.ts
-// Final implementation: genera reportes con 2 pestañas principales (Por_Metodo, Por_Sucursal)
-// y hojas detalle por sucursal que contienen:
-//  - Detalle general
-//  - Sub-tablas por método de pago (con subtotales por método)
-// Además intenta subir el archivo a Meta/WhatsApp (Graph API) usando buffer o file_url fallback.
-// Ajusta rutas y variables de entorno según tu entorno de producción.
+// File: app/api/cron/report-tasa0/route.ts
+// Descripción: Reporte específico de VENTAS DE LIBROS CON IMPUESTO 0
+// Genera reportes con pestañas (Por_Metodo, Por_Sucursal) y detalles.
 
 import { NextResponse } from 'next/server';
 import fs from 'fs';
@@ -29,7 +25,6 @@ function toNumber(value: any): number {
     return Number.isFinite(n) ? n : 0;
   }
   try {
-    // Prisma Decimal-like objects
     // @ts-ignore
     if (typeof value.toNumber === 'function') return value.toNumber();
     // @ts-ignore
@@ -38,33 +33,19 @@ function toNumber(value: any): number {
   return 0;
 }
 
-async function fetchWithTimeout(input: RequestInfo | URL, init?: RequestInit, timeout = 30000) {
-  const controller = new AbortController();
-  const id = setTimeout(() => controller.abort(), timeout);
-  try {
-    const res = await fetch(input, { ...init, signal: controller.signal });
-    clearTimeout(id);
-    return res;
-  } catch (err) {
-    clearTimeout(id);
-    throw err;
-  }
-}
-
 // Reemplaza tu función enviarExcelPorWhatsApp por esta versión más robusta.
-// Lee WHATSAPP_TEMPLATE_BODY_COUNT desde .env (número entero, 0..N).
 async function enviarExcelPorWhatsApp(
   buffer: Buffer | null,
-  var1: string,         // ejemplo: reportId -> {{1}}
-  var2: string,         // ejemplo: tipo -> {{2}}
-  var3: string,         // ejemplo: fecha -> {{3}}
+  var1: string,         // ejemplo: reportId
+  var2: string,         // ejemplo: tipo
+  var3: string,         // ejemplo: fecha
   uploadedFilePath?: string
 ) {
   const token = process.env.WHATSAPP_ACCESS_TOKEN;
   const phoneId = process.env.WHATSAPP_PHONE_NUMBER_ID;
   const recipientPhone = '5214431866632';
-  const templateName = 'documento_contable';
-  const bodyCountEnv = Number(process.env.WHATSAPP_TEMPLATE_BODY_COUNT ?? 2); // default = 2
+  const templateName = 'documento_contable'; // Asegúrate que tu plantilla soporte los variables
+  const bodyCountEnv = Number(process.env.WHATSAPP_TEMPLATE_BODY_COUNT ?? 2); 
   const bodyCount = Number.isFinite(bodyCountEnv) ? Math.max(0, Math.floor(bodyCountEnv)) : 2;
 
   if (!token || !phoneId) {
@@ -79,65 +60,54 @@ async function enviarExcelPorWhatsApp(
     const blob = new Blob([new Uint8Array(b)], {
       type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
     });
-    formData.append('file', blob, `Reporte_Ventas_${var3}.xlsx`);
+    // MODIFICADO: Nombre de archivo específico para este reporte
+    formData.append('file', blob, `Reporte_Libros_Tasa0_${var3}.xlsx`);
 
     const url = `https://graph.facebook.com/v19.0/${phoneId}/media`;
     const res = await fetch(url, {
       method: 'POST',
-      headers: { Authorization: `Bearer ${token}` }, // no content-type
+      headers: { Authorization: `Bearer ${token}` },
       body: formData as any
     });
 
     const json = await res.json().catch(() => ({}));
     if (!res.ok) {
       const err = json?.error?.message || JSON.stringify(json);
-      const e = new Error(`Meta Upload Error: ${err}`);
-      // attach json for debugging
-      // @ts-ignore
-      e['meta'] = json;
-      throw e;
+      throw new Error(`Meta Upload Error: ${err}`);
     }
     return json.id;
   }
 
-  // 1) subir buffer (si existe)
   let mediaId: string | undefined;
   try {
     if (buffer) {
       mediaId = await uploadBufferGetMediaId(buffer);
       console.log('Media uploaded via buffer, id=', mediaId);
-    } else {
-      console.warn('No buffer available to upload (buffer is null).');
     }
   } catch (uploadErr) {
-    // si falla la subida por timeout/conexión devolvemos error concreto para que lo revises
     console.error('Buffer upload failed:', uploadErr);
-    // Re-throw para que el caller vea el detalle (o puedes devolver un objeto JSON)
     throw uploadErr;
   }
 
   if (!mediaId) {
-    throw new Error('No se obtuvo mediaId. Revisa que el buffer exista y la conectividad con graph.facebook.com');
+    throw new Error('No se obtuvo mediaId.');
   }
 
-  // 2) Construir body parameters según el conteo esperado por la plantilla
   const candidateVars = [var1 ?? '', var2 ?? '', var3 ?? ''];
   const bodyParams: Array<{ type: 'text'; text: string }> = [];
 
   for (let i = 0; i < bodyCount; i++) {
-    // si no hay suficiente candidateVars, ponemos string vacío para no romper el conteo
     const v = candidateVars[i] ?? '';
     bodyParams.push({ type: 'text', text: String(v) });
   }
 
-  // Si bodyCount == 0, no incluimos componente body
   const components: any[] = [
     {
       type: 'header',
       parameters: [
         {
           type: 'document',
-          document: { id: mediaId, filename: `Corte_Ventas_${var3}.xlsx` }
+          document: { id: mediaId, filename: `Libros_Tasa0_${var3}.xlsx` } // MODIFICADO: Nombre visual en WhatsApp
         }
       ]
     }
@@ -157,7 +127,6 @@ async function enviarExcelPorWhatsApp(
     }
   };
 
-  // 3) Enviar mensaje; si Meta responde con #132000 devolvemos el body completo para debugging
   const urlMessages = `https://graph.facebook.com/v19.0/${phoneId}/messages`;
   const res = await fetch(urlMessages, {
     method: 'POST',
@@ -170,27 +139,13 @@ async function enviarExcelPorWhatsApp(
 
   const resJson = await res.json().catch(() => ({}));
   if (!res.ok) {
-    // Si es mismatch de parámetros, devuelvo información explícita para que adaptes plantilla/env
-    if (resJson && resJson.error && String(resJson.error.message).includes('Number of parameters')) {
-      const err = new Error('Meta template params mismatch: ' + (resJson.error.message || JSON.stringify(resJson)));
-      // adjunta respuesta completa para debugging
-      // @ts-ignore
-      err['meta'] = resJson;
-      throw err;
-    }
-    // Otro error genérico
-    const err = new Error('Meta send message error: ' + (resJson.error?.message || JSON.stringify(resJson)));
-    // @ts-ignore
-    err['meta'] = resJson;
-    throw err;
+    throw new Error('Meta send message error: ' + (resJson.error?.message || JSON.stringify(resJson)));
   }
 
-  console.log('WhatsApp send OK:', resJson);
   return resJson;
 }
 
-
-// --- Cálculo de rango específico para días 15 y 25 ---
+// --- Cálculo de rango específico ---
 function computeRangeFor15And25(startParam?: string | null, endParam?: string | null) {
   if (startParam && endParam) {
     const s = new Date(startParam); s.setHours(0,0,0,0);
@@ -207,22 +162,19 @@ function computeRangeFor15And25(startParam?: string | null, endParam?: string | 
     return { start, end };
   }
 
-  if (day === 25) {
+  if (day === 29) {
     const start = new Date(today); start.setDate(15); start.setHours(0,0,0,0);
     const end = new Date(today); end.setHours(23,59,59,999);
     return { start, end };
   }
 
-  // default last 7 days
   const end = new Date(); end.setHours(23,59,59,999);
   const start = new Date(); start.setDate(start.getDate() - 7); start.setHours(0,0,0,0);
   return { start, end };
 }
 
-// Helper: create numeric cell object for XLSX aoa
-function numCell(value: number) {
-  return { v: toNumber(value), t: 'n', z: '#,##0.00' } as any;
-}
+// Helpers celdas Excel
+function numCell(value: number) { return { v: toNumber(value), t: 'n', z: '#,##0.00' } as any; }
 function textCell(value: any) { return { v: value != null ? String(value) : '', t: 's' } as any; }
 
 // --- HANDLER PRINCIPAL (GET) ---
@@ -241,18 +193,34 @@ export async function GET(request: Request) {
   try {
     const { start: startDate, end: endDate } = computeRangeFor15And25(startParam, endParam);
 
-    // Traer ventas completadas en el rango con relaciones
+    // --- CONSULTA MODIFICADA ---
     const ventas = await prisma.sale.findMany({
-      where: { fecha: { gte: startDate, lte: endDate }, estado: 'COMPLETADA' },
-      include: { sucursal: true, user: true, datosFactura: true, details: { include: { book: true } } },
+      where: { 
+        fecha: { gte: startDate, lte: endDate }, 
+        estado: 'COMPLETADA',
+        // 1. Condición: Impuestos sean 0
+        impuestos: 0, 
+        // 2. Condición: Que sea libro (buscamos en details si existe algun bookId)
+        details: {
+            some: {
+                bookId: { not: null }
+            }
+        }
+      },
+      include: { 
+        sucursal: true, 
+        user: true, 
+        datosFactura: true, 
+        details: { include: { book: true } } 
+      },
       orderBy: { fecha: 'desc' }
     });
 
     if (!ventas || ventas.length === 0) {
-      return NextResponse.json({ message: 'No hay ventas para reportar en el rango seleccionado.' });
+      return NextResponse.json({ message: 'No hay ventas de libros con Tasa 0 para reportar en el rango.' });
     }
 
-    // Recolectar sucursales y metodos
+    // --- LOGICA DE PROCESAMIENTO (Igual al reporte original) ---
     const sucursalesSet = new Set<string>();
     const metodosSet = new Set<string>();
     for (const v of ventas) {
@@ -262,7 +230,6 @@ export async function GET(request: Request) {
     const sucursales = Array.from(sucursalesSet).sort();
     const metodos = Array.from(metodosSet).sort();
 
-    // Pivots y detallePorSucursal (estructura con general + porMetodo)
     const pivotMetodo: Record<string, Record<string, number>> = {};
     const pivotSucursal: Record<string, Record<string, number>> = {};
     for (const m of metodos) { pivotMetodo[m] = {}; for (const s of sucursales) pivotMetodo[m][s] = 0; pivotMetodo[m]['TOTAL'] = 0; }
@@ -275,7 +242,6 @@ export async function GET(request: Request) {
     let totalImpuestosPeriodo = 0;
     let totalDescuentosPeriodo = 0;
 
-    // Llenar estructuras
     for (const venta of ventas) {
       const suc = venta.sucursal?.nombre ?? 'SIN_SUCURSAL';
       const metodo = String(venta.metodoPago || 'OTRO').replace(/_/g, ' ');
@@ -310,7 +276,6 @@ export async function GET(request: Request) {
       detallePorSucursal[suc].porMetodo[metodo].push(fila);
     }
 
-    // --- Construir arrays para hojas principales (Por_Metodo, Por_Sucursal) ---
     const sheetMetodoRows = [];
     for (const m of metodos) {
       const row: any = { MetodoPago: m };
@@ -323,7 +288,6 @@ export async function GET(request: Request) {
       row['TOTAL'] = filaTotal;
       sheetMetodoRows.push(row);
     }
-    // fila totales por sucursal
     const totalRowForMetodo: any = { MetodoPago: 'TOTAL' };
     let grandTotalMetodo = 0;
     for (const s of sucursales) {
@@ -358,22 +322,18 @@ export async function GET(request: Request) {
     totalRowForSucursal['TOTAL'] = grandTotalSucursal;
     sheetSucursalRows.push(totalRowForSucursal);
 
-    // --- Crear workbook y hojas ---
+    // --- Crear workbook ---
     const workbook = XLSX.utils.book_new();
 
-    // Hoja: Por_Metodo
     const wsMetodo = XLSX.utils.json_to_sheet(sheetMetodoRows);
-    // formatear columnas (anchos)
     wsMetodo['!cols'] = [{ wch: 25 }].concat(sucursales.map(() => ({ wch: 18 }))).concat([{ wch: 18 }]);
-    // aplicar formato numérico a todas las celdas numéricas (recorremos celdas)
     Object.keys(wsMetodo).forEach(k => {
       if (k[0] === '!') return;
       const cell = wsMetodo[k];
       if (cell && typeof cell.v === 'number') cell.z = '#,##0.00';
     });
-    XLSX.utils.book_append_sheet(workbook, wsMetodo, 'Por_Metodo');
+    XLSX.utils.book_append_sheet(workbook, wsMetodo, 'Por_Metodo_Tasa0');
 
-    // Hoja: Por_Sucursal
     const wsSucursal = XLSX.utils.json_to_sheet(sheetSucursalRows);
     wsSucursal['!cols'] = [{ wch: 30 }].concat(metodos.map(() => ({ wch: 18 }))).concat([{ wch: 18 }]);
     Object.keys(wsSucursal).forEach(k => {
@@ -381,107 +341,58 @@ export async function GET(request: Request) {
       const cell = wsSucursal[k];
       if (cell && typeof cell.v === 'number') cell.z = '#,##0.00';
     });
-    XLSX.utils.book_append_sheet(workbook, wsSucursal, 'Por_Sucursal');
+    XLSX.utils.book_append_sheet(workbook, wsSucursal, 'Por_Sucursal_Tasa0');
 
-    // Hojas detalle por sucursal: construir AOAs para permitir secciones y subtotales
     for (const s of sucursales) {
       const rowsAOA: any[] = [];
-
-      // Título general
-      rowsAOA.push([`DETALLE GENERAL - ${s}`]);
-      rowsAOA.push([]); // espacio
-
-      // Encabezados de tabla general
+      rowsAOA.push([`DETALLE GENERAL (LIBROS TASA 0) - ${s}`]);
+      rowsAOA.push([]);
       const header = ['Fecha', 'Hora', 'Folio', 'MetodoPago', 'Vendedor', 'Cliente', 'MontoTotal', 'Impuestos', 'DescuentoTotal'];
       rowsAOA.push(header);
 
-      // Filas generales
       const generalRows = detallePorSucursal[s].general;
       let subtotalGeneral = 0;
       for (const r of generalRows) {
         rowsAOA.push([
-          r.Fecha,
-          r.Hora,
-          r.Folio,
-          r.MetodoPago,
-          r.Vendedor,
-          r.Cliente,
-          numCell(r.MontoTotal),
-          numCell(r.Impuestos),
-          numCell(r.DescuentoTotal)
+          r.Fecha, r.Hora, r.Folio, r.MetodoPago, r.Vendedor, r.Cliente,
+          numCell(r.MontoTotal), numCell(r.Impuestos), numCell(r.DescuentoTotal)
         ]);
         subtotalGeneral += toNumber(r.MontoTotal);
       }
-      // fila total general
       rowsAOA.push([]);
       rowsAOA.push(['', '', '', '', '', 'TOTAL GENERAL', numCell(subtotalGeneral), '', '']);
-      rowsAOA.push([]); // espacio
+      rowsAOA.push([]);
 
-      // Sub-tablas por método
       const metodoKeys = Object.keys(detallePorSucursal[s].porMetodo).sort();
       for (const m of metodoKeys) {
         rowsAOA.push([`VENTAS POR ${m.toUpperCase()}`]);
-        rowsAOA.push([]); // espacio
+        rowsAOA.push([]);
         rowsAOA.push(header);
 
         const methodRows = detallePorSucursal[s].porMetodo[m];
         let subtotalMetodo = 0;
         for (const mr of methodRows) {
           rowsAOA.push([
-            mr.Fecha,
-            mr.Hora,
-            mr.Folio,
-            mr.MetodoPago,
-            mr.Vendedor,
-            mr.Cliente,
-            numCell(mr.MontoTotal),
-            numCell(mr.Impuestos),
-            numCell(mr.DescuentoTotal)
+            mr.Fecha, mr.Hora, mr.Folio, mr.MetodoPago, mr.Vendedor, mr.Cliente,
+            numCell(mr.MontoTotal), numCell(mr.Impuestos), numCell(mr.DescuentoTotal)
           ]);
           subtotalMetodo += toNumber(mr.MontoTotal);
         }
         rowsAOA.push([]);
         rowsAOA.push(['', '', '', '', '', `SUBTOTAL ${m}`, numCell(subtotalMetodo), '', '']);
-        rowsAOA.push([]); // espacio entre métodos
+        rowsAOA.push([]);
       }
 
-      // Convertir AOA a worksheet (preservando tipos/formatos de números)
       const ws = XLSX.utils.aoa_to_sheet(rowsAOA);
-      // Ajustar anchos de columna básicos
       ws['!cols'] = [
-        { wch: 12 }, // Fecha
-        { wch: 10 }, // Hora
-        { wch: 8 },  // Folio
-        { wch: 18 }, // MetodoPago
-        { wch: 24 }, // Vendedor
-        { wch: 30 }, // Cliente
-        { wch: 14 }, // MontoTotal
-        { wch: 14 }, // Impuestos
-        { wch: 14 }  // DescuentoTotal
+        { wch: 12 }, { wch: 10 }, { wch: 8 }, { wch: 18 }, { wch: 24 }, { wch: 30 },
+        { wch: 14 }, { wch: 14 }, { wch: 14 }
       ];
-
-      // Attempt to emphasize header rows: we uppercase header text (visual) already; styling (.s) is not reliable across environments
       XLSX.utils.book_append_sheet(workbook, ws, `Detalle_${s}`.substring(0, 31));
     }
 
-    // Adjuntar archivo previo si existe (opcional)
-    try {
-      if (fs.existsSync(UPLOADED_FILE_PATH)) {
-        const existingWb = XLSX.readFile(UPLOADED_FILE_PATH);
-        existingWb.SheetNames.forEach((sn, idx) => {
-          const sheet = existingWb.Sheets[sn];
-          const newName = `CortePrevio_${idx + 1}_${sn}`.substring(0, 31);
-          XLSX.utils.book_append_sheet(workbook, sheet, newName);
-        });
-      }
-    } catch (err) {
-      console.warn('No se pudo adjuntar archivo previo:', err);
-    }
-
-    // Generar buffer final
     const excelBuffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
 
-    // Determine reportId and reportDate variables for template:
     const today = new Date();
     let reportId = '';
     if (today.getDate() === 15) reportId = '01';
@@ -489,19 +400,18 @@ export async function GET(request: Request) {
     else reportId = `${String(today.getFullYear()).slice(2)}${pad2(today.getMonth() + 1)}${pad2(today.getDate())}`;
     const reportDateStr = formatDateDDMMYYYY(endDate);
 
-    // Enviar por WhatsApp (intentamos buffer + fallback path)
+    // MODIFICADO: Título del segundo parámetro para identificarlo en WhatsApp
     try {
-      await enviarExcelPorWhatsApp(excelBuffer, reportId, 'Contable', reportDateStr, UPLOADED_FILE_PATH);
+      await enviarExcelPorWhatsApp(excelBuffer, reportId, 'Libros Tasa 0', reportDateStr, UPLOADED_FILE_PATH);
     } catch (errSend) {
       console.error('Error enviando archivo por WhatsApp:', errSend);
       return NextResponse.json({
         success: false,
-        message: 'No se pudo enviar el archivo por WhatsApp. Revisa conectividad/credenciales.',
+        message: 'No se pudo enviar el archivo por WhatsApp.',
         error: errSend instanceof Error ? errSend.message : String(errSend)
       }, { status: 502 });
     }
 
-    // Respuesta final (JSON)
     if (format === 'json') {
       return NextResponse.json({
         success: true,
@@ -509,11 +419,7 @@ export async function GET(request: Request) {
         periodo: { start: startDate.toISOString(), end: endDate.toISOString() },
         reportId,
         reportDate: reportDateStr,
-        totals: {
-          totalVentasPeriodo,
-          totalImpuestosPeriodo,
-          totalDescuentosPeriodo
-        },
+        totals: { totalVentasPeriodo, totalImpuestosPeriodo, totalDescuentosPeriodo },
         sheets: {
           porMetodoRows: sheetMetodoRows.length,
           porSucursalRows: sheetSucursalRows.length,
@@ -524,18 +430,11 @@ export async function GET(request: Request) {
 
     return NextResponse.json({
       success: true,
-      sales_count: ventas.length,
-      periodo: { start: startDate.toISOString(), end: endDate.toISOString() },
-      reportId,
-      reportDate: reportDateStr,
-      sheets: {
-        porMetodoRows: sheetMetodoRows.length,
-        porSucursalRows: sheetSucursalRows.length,
-        detalleSheets: sucursales.length
-      }
+      message: "Reporte Tasa 0 generado y enviado correctamente",
+      sales_count: ventas.length
     });
   } catch (error) {
-    console.error('Error en reporte final:', error);
+    console.error('Error en reporte Tasa 0:', error);
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Error desconocido' },
       { status: 500 }

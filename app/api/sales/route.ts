@@ -3,10 +3,61 @@ import prisma from '@/lib/prisma';
 import { sendWhatsAppReceipt } from '@/lib/whatsapp';
 import { PaymentMethod } from '@prisma/client';
 
-// 1. Modificamos la interfaz para aceptar el TIPO de producto
+// --- GET: Listado de Ventas y Estadísticas ---
+export async function GET(request: Request) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const limit = Number(searchParams.get('limit')) || 50;
+    
+    // Obtenemos ventas ordenadas por fecha reciente
+    const sales = await prisma.sale.findMany({
+      take: limit,
+      orderBy: { fecha: 'desc' },
+      include: {
+        user: { select: { nombre: true } },
+        sucursal: { select: { nombre: true } },
+        details: {
+            select: { cantidad_vendida: true }
+        }
+      }
+    });
+
+    // Calcular estadísticas básicas para el Dashboard
+    const totalRevenue = sales.reduce((acc, sale) => acc + Number(sale.montoTotal), 0);
+    const totalTransactions = sales.length;
+    const avgTicket = totalTransactions > 0 ? totalRevenue / totalTransactions : 0;
+
+    // Formatear datos para la tabla
+    const formattedSales = sales.map(sale => ({
+      id: sale.id,
+      fecha: sale.fecha,
+      vendedor: sale.user?.nombre || "Desconocido",
+      sucursal: sale.sucursal?.nombre || "General",
+      metodoPago: sale.metodoPago,
+      total: Number(sale.montoTotal),
+      itemsCount: sale.details.reduce((acc, curr) => acc + curr.cantidad_vendida, 0),
+      estado: sale.estado
+    }));
+
+    return NextResponse.json({
+      stats: {
+        totalRevenue,
+        totalTransactions,
+        avgTicket
+      },
+      sales: formattedSales
+    });
+
+  } catch (error) {
+    console.error("Error fetching sales:", error);
+    return NextResponse.json({ message: 'Error al obtener ventas' }, { status: 500 });
+  }
+}
+
+// --- POST: Crear Venta Mixta (Libros + Dulces) ---
 interface CartItemPayload {
-  id: number;          // Ahora es genérico, puede ser bookId o dulceId
-  type: 'BOOK' | 'DULCE'; // 👈 NUEVO: Indispensable para saber dónde buscar
+  id: number;      
+  type: 'BOOK' | 'DULCE'; 
   quantity: number;
 }
 
@@ -36,7 +87,6 @@ export async function POST(request: Request) {
       // A) Procesar cada item
       for (const item of items) {
         
-        // Validaciones básicas
         if (!item.id || !item.type) {
             throw new Error(`Item inválido en el carrito (Falta ID o Type)`);
         }
@@ -45,15 +95,12 @@ export async function POST(request: Request) {
         const sucursalIdNum = Number(sucursalId);
         const itemIdNum = Number(item.id);
 
-        // Variables para normalizar datos (ya sea Libro o Dulce)
         let precioVentaOriginal = 0;
         let tasaIva = 0;
         let tituloProducto = "";
         
         // --- LÓGICA DE BIFURCACIÓN (LIBRO vs DULCE) ---
-        
         if (item.type === 'BOOK') {
-            // 1. Buscar en Inventario de Libros
             const invRecord = await tx.inventario.findUnique({
                 where: { bookId_sucursalId: { bookId: itemIdNum, sucursalId: sucursalIdNum } },
                 include: { book: true }
@@ -62,42 +109,35 @@ export async function POST(request: Request) {
             if (!invRecord) throw new Error(`El libro (ID: ${itemIdNum}) no existe en esta sucursal.`);
             if (invRecord.stock < cantidad) throw new Error(`Stock insuficiente para libro: ${invRecord.book.titulo}`);
 
-            // Extraer datos
             precioVentaOriginal = Number(invRecord.book.precioVenta);
             tasaIva = Number(invRecord.book.tasaIva) || 0;
             tituloProducto = invRecord.book.titulo;
 
-            // Restar Stock
             await tx.inventario.update({
                 where: { bookId_sucursalId: { bookId: itemIdNum, sucursalId: sucursalIdNum } },
                 data: { stock: { decrement: cantidad } }
             });
 
         } else if (item.type === 'DULCE') {
-            // 2. Buscar en Inventario de Dulces
             const invRecord = await tx.inventarioDulce.findUnique({
                 where: { dulceId_sucursalId: { dulceId: itemIdNum, sucursalId: sucursalIdNum } },
-                include: { dulce: true } // Relación definida en tu schema
+                include: { dulce: true }
             });
 
             if (!invRecord) throw new Error(`El dulce (ID: ${itemIdNum}) no existe en esta sucursal.`);
             if (invRecord.stock < cantidad) throw new Error(`Stock insuficiente para dulce: ${invRecord.dulce.nombre}`);
 
-            // Extraer datos
             precioVentaOriginal = Number(invRecord.dulce.precioVenta);
             tasaIva = Number(invRecord.dulce.tasaIva) || 0;
             tituloProducto = invRecord.dulce.nombre;
 
-            // Restar Stock
             await tx.inventarioDulce.update({
                 where: { dulceId_sucursalId: { dulceId: itemIdNum, sucursalId: sucursalIdNum } },
                 data: { stock: { decrement: cantidad } }
             });
-        } else {
-            throw new Error(`Tipo de producto no soportado: ${item.type}`);
         }
 
-        // --- CÁLCULOS FINANCIEROS (Comunes para ambos) ---
+        // Cálculos Financieros
         const descuentoUnitario = precioVentaOriginal * (discountPercent / 100);
         const precioFinalConDescuento = precioVentaOriginal - descuentoUnitario;
         const precioBaseUnitario = precioFinalConDescuento / (1 + (tasaIva / 100));
@@ -113,10 +153,9 @@ export async function POST(request: Request) {
         saleTotal += totalLinea;
         saleDescuentoTotal += descuentoTotalLinea;
 
-        // Preparamos el detalle (Prisma sabe cuál llenar basado en nulls)
         detailData.push({
-          bookId: item.type === 'BOOK' ? itemIdNum : null,   // Si es libro, llenamos este
-          dulceId: item.type === 'DULCE' ? itemIdNum : null, // Si es dulce, llenamos este
+          bookId: item.type === 'BOOK' ? itemIdNum : null,   
+          dulceId: item.type === 'DULCE' ? itemIdNum : null, 
           cantidad_vendida: cantidad, 
           precioUnitario: precioBaseUnitario,
           impuestoAplicado: impuestoLinea,
@@ -137,15 +176,12 @@ export async function POST(request: Request) {
           descuentoTotal: saleDescuentoTotal,
           montoTotal: saleTotal,
           details: {
-            create: detailData // Insertamos todos los detalles preparados
+            create: detailData 
           }
         },
         include: {
           details: { 
-            include: { 
-                book: true,  // Traemos libro si existe
-                dulce: true  // Traemos dulce si existe
-            } 
+            include: { book: true, dulce: true } 
           },
           sucursal: true
         }
@@ -154,16 +190,13 @@ export async function POST(request: Request) {
       return newSale; 
     });
 
-    // 3. Notificación WhatsApp (Actualizada para Dulces)
+    // 3. Notificación WhatsApp
     try {
         const userIdToFind = userId || 1;
         const vendedor = await prisma.user.findUnique({ where: { id: userIdToFind }, select: { nombre: true } });
         
-        // Mapeo inteligente para el recibo
         const itemsReceipt = saleResult.details.map((d) => {
-            // Determinamos el nombre dependiendo de qué relación exista
             const nombreProducto = d.book?.titulo || d.dulce?.nombre || "Producto desconocido";
-            
             return {
                 titulo: nombreProducto,
                 quantity: d.cantidad_vendida,
@@ -179,7 +212,6 @@ export async function POST(request: Request) {
             totalAmount: Number(saleResult.montoTotal),
             paymentMethod: paymentMethod,
         });
-
     } catch (waError) {
         console.error("Error en WhatsApp (no crítico):", waError);
     }
