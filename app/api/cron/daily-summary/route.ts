@@ -114,7 +114,7 @@ export async function GET(request: Request) {
     });
 
     if (ventas.length === 0) {
-      const destinatarios = ['5214431866632', '5214431866632']; 
+      const destinatarios = ['5214431866632', '5214434911529']; 
       await enviarResumenWhatsApp("Sin ventas hoy", formatDate(nowMexico), formatTime(nowMexico), destinatarios);
       return NextResponse.json({ message: 'Sin ventas, reporte vacío enviado.' });
     }
@@ -151,7 +151,7 @@ export async function GET(request: Request) {
     // "Centro: $500.00 | Norte: $200.00 || 💰 TOTAL: $700.00"
 
     // 5. Enviar
-   const destinatarios = ['5214431866632', '5214431866632']; 
+   const destinatarios = ['5214431866632', '5214434911529']; 
 
     await enviarResumenWhatsApp(
         mensajeTexto, 
