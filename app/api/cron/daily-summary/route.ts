@@ -1,6 +1,6 @@
 // File: app/api/cron/daily-summary/route.ts
-// Descripción: Reporte de CIERRE DE CAJA diario (Texto simple para WhatsApp)
-// CORRECCIÓN: Usa formato lineal para evitar errores de saltos de línea en la plantilla.
+// Descripción: Reporte de CIERRE DE CAJA diario con desglose por método de pago.
+// Formato lineal para compatibilidad con plantillas de WhatsApp.
 
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
@@ -14,7 +14,6 @@ function pad2(n: number) { return String(n).padStart(2, '0'); }
 
 function getMexicoDate() {
   const now = new Date();
-  // Forzamos la zona horaria a México para el cálculo del día
   return new Date(now.toLocaleString("en-US", { timeZone: "America/Mexico_City" }));
 }
 
@@ -47,7 +46,7 @@ async function enviarResumenWhatsApp(
   mensajeSucursales: string,
   fecha: string,
   hora: string,
-  numeros: string[] // Ahora recibe un arreglo
+  numeros: string[]
 ) {
   const token = process.env.WHATSAPP_ACCESS_TOKEN;
   const phoneId = process.env.WHATSAPP_PHONE_NUMBER_ID;
@@ -55,7 +54,6 @@ async function enviarResumenWhatsApp(
 
   if (!token || !phoneId) throw new Error("Faltan credenciales de WhatsApp");
 
-  // Promesas para enviar a todos los números en paralelo
   const envios = numeros.map(async (numero) => {
     const payload = {
       messaging_product: 'whatsapp',
@@ -88,6 +86,7 @@ async function enviarResumenWhatsApp(
 
   return Promise.all(envios);
 }
+
 // --- HANDLER PRINCIPAL ---
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -99,12 +98,10 @@ export async function GET(request: Request) {
   }
 
   try {
-    // 1. Calcular rango de "Hoy" (Hora México)
     const nowMexico = getMexicoDate();
     const startOfDay = new Date(nowMexico); startOfDay.setHours(0, 0, 0, 0);
     const endOfDay = new Date(nowMexico); endOfDay.setHours(23, 59, 59, 999);
 
-    // 2. Obtener ventas
     const ventas = await prisma.sale.findMany({
       where: {
         fecha: { gte: startOfDay, lte: endOfDay },
@@ -113,46 +110,47 @@ export async function GET(request: Request) {
       include: { sucursal: true }
     });
 
+    const destinatarios = ['5214431866632', '5214434911529'];
+
     if (ventas.length === 0) {
-      const destinatarios = ['5214431866632', '5214434911529']; 
       await enviarResumenWhatsApp("Sin ventas hoy", formatDate(nowMexico), formatTime(nowMexico), destinatarios);
-      return NextResponse.json({ message: 'Sin ventas, reporte vacío enviado.' });
+      return NextResponse.json({ message: 'Sin ventas, reporte enviado.' });
     }
 
-    // 3. Calcular totales
-    const totalesPorSucursal: Record<string, number> = {};
+    // 1. Estructura de datos: Sucursal -> Métodos -> Monto
+    const desglose: Record<string, { metodos: Record<string, number>, totalSucursal: number }> = {};
     let granTotal = 0;
 
     for (const venta of ventas) {
-      const nombreSucursal = venta.sucursal?.nombre || 'General';
+      const suc = venta.sucursal?.nombre || 'General';
+      const metodo = String(venta.metodoPago || 'OTRO').replace(/_/g, ' ');
       const monto = toNumber(venta.montoTotal);
 
-      if (!totalesPorSucursal[nombreSucursal]) totalesPorSucursal[nombreSucursal] = 0;
-      totalesPorSucursal[nombreSucursal] += monto;
+      if (!desglose[suc]) {
+        desglose[suc] = { metodos: {}, totalSucursal: 0 };
+      }
+
+      desglose[suc].metodos[metodo] = (desglose[suc].metodos[metodo] || 0) + monto;
+      desglose[suc].totalSucursal += monto;
       granTotal += monto;
     }
 
-    // 4. Formatear texto LINEAL (sin saltos de línea)
-    // Usamos " | " como separador visual
+    // 2. Construcción del mensaje lineal
+    // Formato: Sucursal [METODO: $X, METODO: $Y (Total: $Z)]
     let partesMensaje: string[] = [];
-    
-    for (const [sucursal, total] of Object.entries(totalesPorSucursal)) {
-      // Ej: "Centro: $1,200.00"
-      partesMensaje.push(`${sucursal}: ${formatCurrency(total)}`);
+
+    for (const [nombreSuc, data] of Object.entries(desglose)) {
+      const detallesMetodos = Object.entries(data.metodos)
+        .map(([m, total]) => `${m}: ${formatCurrency(total)}`)
+        .join(", ");
+      
+      partesMensaje.push(`${nombreSuc} [${detallesMetodos} | Subtotal: ${formatCurrency(data.totalSucursal)}]`);
     }
-    
-    // Unimos todo con separadores
-    let mensajeTexto = partesMensaje.join("  |  ");
-    
-    // Agregamos el total al final con un separador especial
-    mensajeTexto += `  ||  💰 TOTAL: ${formatCurrency(granTotal)}`;
 
-    // Resultado final será algo como: 
-    // "Centro: $500.00 | Norte: $200.00 || 💰 TOTAL: $700.00"
+    let mensajeTexto = partesMensaje.join("  /  ");
+    mensajeTexto += `  ||  💰 TOTAL GENERAL: ${formatCurrency(granTotal)}`;
 
-    // 5. Enviar
-   const destinatarios = ['5214431866632', '5214434911529']; 
-
+    // 3. Envío
     await enviarResumenWhatsApp(
         mensajeTexto, 
         formatDate(nowMexico), 
@@ -162,8 +160,8 @@ export async function GET(request: Request) {
 
     return NextResponse.json({ 
       success: true, 
-      message: 'Cierre de caja enviado (formato lineal)',
-      data: totalesPorSucursal
+      message: 'Cierre con desglose enviado',
+      data: desglose
     });
 
   } catch (error) {
