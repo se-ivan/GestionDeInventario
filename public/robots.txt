@@ -1,2 +1,5 @@
+User-agent: UptimeRobot
+Allow: /
+
 User-agent: *
 Disallow: /

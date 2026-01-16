@@ -6,6 +6,14 @@ const isProtectedRoute = createRouteMatcher(['/dashboard(.*)', '/admin(.*)']);
 const isAdminRoute = createRouteMatcher(['/admin(.*)']);
 
 export default clerkMiddleware(async (auth, req) => {
+  // Manejo específico para UptimeRobot y peticiones HEAD en la raíz
+  // Esto evita errores 405 y permite que el servicio de monitoreo funcione
+  if (req.method === 'HEAD' && req.nextUrl.pathname === '/') {
+    const response = NextResponse.next();
+    response.headers.set('X-Robots-Tag', 'noindex, nofollow');
+    return response;
+  }
+
   const { userId, sessionClaims, redirectToSignIn } = await auth();
 
   // A. Protección básica: Si no está logueado y la ruta es protegida
