@@ -3,10 +3,11 @@ import prisma from '@/lib/prisma';
 
 export async function DELETE(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const id = parseInt(params.id);
+    const { id: idParam } = await params;
+    const id = parseInt(idParam);
     
     // Validar si existe
     const expense = await prisma.expense.findUnique({
@@ -31,10 +32,11 @@ export async function DELETE(
 
 export async function PATCH(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const id = parseInt(params.id);
+    const { id: idParam } = await params;
+    const id = parseInt(idParam);
     const body = await request.json();
     const { concepto, monto, categoria } = body;
 
