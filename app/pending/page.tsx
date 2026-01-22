@@ -5,6 +5,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { Label } from "@/components/ui/label"
 import {
   Search,
   Plus,
@@ -18,6 +20,7 @@ import {
   Eye,
   Edit,
   Users,
+  Loader2,
 } from "lucide-react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
@@ -67,6 +70,93 @@ export default function PendingSearchesPage() {
   const [filterEstado, setFilterEstado] = useState<string>("todos")
   const [filterPrioridad, setFilterPrioridad] = useState<string>("todos")
   const pathname = usePathname()
+
+  const [isNewSearchOpen, setIsNewSearchOpen] = useState(false)
+  const [newSearch, setNewSearch] = useState({
+    titulo: "",
+    autor: "",
+    cliente_nombre: "",
+    cliente_telefono: "",
+    isbn: "",
+    editorial: "",
+    genero: "",
+    descripcion: "",
+    precio_estimado: "",
+    cliente_email: "",
+    cliente_notas: "",
+    prioridad: "media",
+  })
+
+  const [isSearching, setIsSearching] = useState(false)
+  const [searchError, setSearchError] = useState<string | null>(null)
+
+  const handleSmartSearch = async () => {
+    if (!newSearch.isbn) return
+
+    setIsSearching(true)
+    setSearchError(null)
+
+    try {
+      const apiKey = process.env.NEXT_PUBLIC_GOOGLE_BOOKS_API_KEY
+      if (apiKey) {
+        const googleRes = await fetch(`https://www.googleapis.com/books/v1/volumes?q=isbn:${newSearch.isbn}&key=${apiKey}`)
+        const data = await googleRes.json()
+
+        if (data.totalItems > 0) {
+          const info = data.items[0].volumeInfo
+          
+          setNewSearch(prev => ({
+            ...prev,
+            titulo: info.title || prev.titulo,
+            autor: info.authors ? info.authors.join(', ') : prev.autor,
+            editorial: info.publisher || prev.editorial,
+            genero: info.categories ? info.categories[0] : prev.genero,
+            descripcion: info.description ? info.description.substring(0, 500) : prev.descripcion,
+          }))
+        } else {
+          setSearchError("No encontrado en Google Books")
+        }
+      } else {
+        setSearchError("API Key no configurada")
+      }
+    } catch (error) {
+       console.error(error)
+       setSearchError("Error al buscar el libro")
+    } finally {
+      setIsSearching(false)
+    }
+  }
+
+  const handleCreateSearch = async (e: React.FormEvent) => {
+    e.preventDefault()
+    try {
+      const response = await fetch("/api/pending-searches", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(newSearch),
+      })
+      if (response.ok) {
+        setIsNewSearchOpen(false)
+        fetchPendingSearches()
+        setNewSearch({
+            titulo: "",
+            autor: "",
+            cliente_nombre: "",
+            cliente_telefono: "",
+            isbn: "",
+            editorial: "",
+            genero: "",
+            descripcion: "",
+            precio_estimado: "",
+            cliente_email: "",
+            cliente_notas: "",
+            prioridad: "media",
+        })
+      }
+    } catch (error) {
+      console.error("Error creating search:", error)
+    }
+  }
 
   useEffect(() => {
     fetchPendingSearches()
@@ -240,7 +330,10 @@ export default function PendingSearchesPage() {
             <option value="urgente">Urgente</option>
           </select>
 
-          <Button className="bg-blue-600 hover:bg-blue-700">
+          <Button 
+            className="bg-blue-600 hover:bg-blue-700" 
+            onClick={() => setIsNewSearchOpen(true)}
+          >
             <Plus className="h-4 w-4 mr-2" />
             Nueva Búsqueda
           </Button>
@@ -351,12 +444,163 @@ export default function PendingSearchesPage() {
                 ? "No se encontraron resultados con los filtros aplicados"
                 : "Comienza agregando una nueva búsqueda de libro"}
             </p>
-            <Button className="bg-blue-600 hover:bg-blue-700">
+            <Button 
+              className="bg-blue-600 hover:bg-blue-700"
+              onClick={() => setIsNewSearchOpen(true)}
+            >
               <Plus className="h-4 w-4 mr-2" />
               Nueva Búsqueda
             </Button>
           </div>
         )}
+
+        <Dialog open={isNewSearchOpen} onOpenChange={setIsNewSearchOpen}>
+            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>Registrar Búsqueda de Libro</DialogTitle>
+                <DialogDescription>
+                  Ingresa los detalles del libro y la información de contacto del cliente.
+                </DialogDescription>
+              </DialogHeader>
+              <form onSubmit={handleCreateSearch} className="grid gap-4 py-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="grid gap-2">
+                    <Label htmlFor="titulo">Título del Libro *</Label>
+                    <Input
+                      id="titulo"
+                      value={newSearch.titulo}
+                      onChange={(e) => setNewSearch({ ...newSearch, titulo: e.target.value })}
+                      required
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="autor">Autor</Label>
+                    <Input
+                      id="autor"
+                      value={newSearch.autor}
+                      onChange={(e) => setNewSearch({ ...newSearch, autor: e.target.value })}
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="grid gap-2">
+                    <Label htmlFor="isbn">ISBN</Label>
+                    <div className="flex gap-2">
+                      <Input
+                        id="isbn"
+                        value={newSearch.isbn}
+                        onChange={(e) => setNewSearch({ ...newSearch, isbn: e.target.value })}
+                        placeholder="Escanea o escribe..."
+                      />
+                      <Button type="button" onClick={handleSmartSearch} disabled={isSearching} variant="secondary">
+                        {isSearching ? <Loader2 className="animate-spin h-4 w-4" /> : <Search className="h-4 w-4" />}
+                      </Button>
+                    </div>
+                    {searchError && <p className="text-xs text-red-500">{searchError}</p>}
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="editorial">Editorial</Label>
+                    <Input
+                      id="editorial"
+                      value={newSearch.editorial}
+                      onChange={(e) => setNewSearch({ ...newSearch, editorial: e.target.value })}
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="grid gap-2">
+                    <Label htmlFor="genero">Género</Label>
+                    <Input
+                      id="genero"
+                      value={newSearch.genero}
+                      onChange={(e) => setNewSearch({ ...newSearch, genero: e.target.value })}
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="precio_estimado">Precio Estimado</Label>
+                    <Input
+                      id="precio_estimado"
+                      type="number"
+                      value={newSearch.precio_estimado}
+                      onChange={(e) => setNewSearch({ ...newSearch, precio_estimado: e.target.value })}
+                    />
+                  </div>
+                </div>
+
+                <div className="grid gap-2">
+                  <Label htmlFor="descripcion">Descripción / Notas del Libro</Label>
+                  <Input
+                    id="descripcion"
+                    value={newSearch.descripcion}
+                    onChange={(e) => setNewSearch({ ...newSearch, descripcion: e.target.value })}
+                  />
+                </div>
+
+                <div className="border-t pt-4 mt-2">
+                  <h3 className="font-medium mb-3">Datos del Cliente</h3>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="grid gap-2">
+                      <Label htmlFor="cliente_nombre">Nombre del Cliente *</Label>
+                      <Input
+                        id="cliente_nombre"
+                        value={newSearch.cliente_nombre}
+                        onChange={(e) => setNewSearch({ ...newSearch, cliente_nombre: e.target.value })}
+                        required
+                      />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="cliente_telefono">Teléfono *</Label>
+                      <Input
+                        id="cliente_telefono"
+                        value={newSearch.cliente_telefono}
+                        onChange={(e) => setNewSearch({ ...newSearch, cliente_telefono: e.target.value })}
+                        required
+                      />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4 mt-4">
+                    <div className="grid gap-2">
+                      <Label htmlFor="cliente_email">Email</Label>
+                      <Input
+                        id="cliente_email"
+                        type="email"
+                        value={newSearch.cliente_email}
+                        onChange={(e) => setNewSearch({ ...newSearch, cliente_email: e.target.value })}
+                      />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="prioridad">Prioridad</Label>
+                      <select
+                        id="prioridad"
+                        className="flex h-10 w-full items-center justify-between rounded-md border border-slate-200 bg-white px-3 py-2 text-sm ring-offset-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-950 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                        value={newSearch.prioridad}
+                        onChange={(e) => setNewSearch({ ...newSearch, prioridad: e.target.value })}
+                      >
+                       <option value="baja">Baja</option>
+                       <option value="media">Media</option>
+                       <option value="alta">Alta</option>
+                       <option value="urgente">Urgente</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div className="grid gap-2 mt-4">
+                    <Label htmlFor="cliente_notas">Notas del Cliente</Label>
+                    <Input
+                      id="cliente_notas"
+                      value={newSearch.cliente_notas}
+                      onChange={(e) => setNewSearch({ ...newSearch, cliente_notas: e.target.value })}
+                    />
+                  </div>
+                </div>
+
+                <DialogFooter>
+                  <Button type="submit">Guardar Búsqueda</Button>
+                </DialogFooter>
+              </form>
+            </DialogContent>
+          </Dialog>
       </main>
     </div>
   )

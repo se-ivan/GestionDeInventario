@@ -42,6 +42,7 @@ model User {
   sucursal   Sucursal?   @relation(fields: [sucursalId], references: [id])
   sales      Sale[]
   cajas      CorteCaja[]
+  expenses   Expense[]
 
   createdAt DateTime @default(now()) @map("created_at")
 
@@ -60,6 +61,7 @@ model Sucursal {
   
   users            User[]
   sales            Sale[]
+  expenses         Expense[]
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -296,4 +298,33 @@ model busquedas_pendientes {
   @@index([estado], map: "idx_busquedas_estado")
   @@index([fecha_solicitud], map: "idx_busquedas_fecha_solicitud")
   @@index([prioridad], map: "idx_busquedas_prioridad")
+}
+
+// --- GASTOS ---
+model Expense {
+  id          Int      @id @default(autoincrement())
+  monto       Decimal  @db.Decimal(10, 2)
+  concepto    String
+  categoria   String   // "LIMPIEZA", "PAPELERIA", "INSUMOS", "OTROS"
+  fecha       DateTime @default(now())
+  
+  userId      Int      @map("user_id")
+  user        User     @relation(fields: [userId], references: [id])
+  
+  sucursalId  Int      @map("sucursal_id")
+  sucursal    Sucursal @relation(fields: [sucursalId], references: [id])
+
+  createdAt   DateTime @default(now()) @map("created_at")
+  
+  @@map("expenses")
+}
+
+model Notification {
+  id        Int      @id @default(autoincrement())
+  type      String   // "GASTO", "STOCK_BAJO", etc.
+  message   String
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("notifications")
 }

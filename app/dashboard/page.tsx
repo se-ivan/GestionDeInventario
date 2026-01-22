@@ -48,15 +48,31 @@ export default function VentasDashboard() {
   const [selectedSale, setSelectedSale] = useState<any | null>(null)
   const [isDetailOpen, setIsDetailOpen] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
+  
+  // Expenses State
+  const [expenses, setExpenses] = useState<any[]>([])
+  const [totalExpenses, setTotalExpenses] = useState(0)
 
   // Carga de datos
   const fetchSales = async () => {
     setLoading(true)
     try {
-      const res = await fetch('/api/sales?limit=50')
+      const today = new Date().toISOString().split('T')[0]
+      const [res, expensesRes] = await Promise.all([
+         fetch('/api/sales?limit=100'),
+         fetch(`/api/expenses?date=${today}`)
+      ])
+
       const data = await res.json()
       setSales(data.sales || [])
       setStats(data.stats || { totalRevenue: 0, totalTransactions: 0, avgTicket: 0 })
+
+      if (expensesRes.ok) {
+        const expData = await expensesRes.json()
+        setExpenses(expData)
+        const total = expData.reduce((acc: number, curr: any) => acc + Number(curr.monto), 0)
+        setTotalExpenses(total)
+      }
     } catch (error) {
       console.error(error)
     } finally {
@@ -125,10 +141,12 @@ export default function VentasDashboard() {
       </div>
 
       {/* STATS CARDS - Diseño limpio sin bordes duros */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
         {[
-            { title: "Ingresos Totales", value: formatCurrency(stats.totalRevenue), icon: DollarSign, color: "text-emerald-600", bg: "bg-emerald-50" },
-            { title: "Transacciones", value: stats.totalTransactions, icon: Receipt, color: "text-blue-600", bg: "bg-blue-50" },
+            { title: "Ventas Totales", value: formatCurrency(stats.totalRevenue), icon: DollarSign, color: "text-emerald-600", bg: "bg-emerald-50" },
+            { title: "Gastos del Día", value: formatCurrency(totalExpenses), icon: ArrowUpRight, color: "text-red-600", bg: "bg-red-50" },
+            { title: "Balance Neto", value: formatCurrency(stats.totalRevenue - totalExpenses), icon: Store, color: (stats.totalRevenue - totalExpenses) >= 0 ? "text-blue-600" : "text-red-600", bg: "bg-slate-50" },
+            { title: "Transacciones", value: stats.totalTransactions, icon: Receipt, color: "text-slate-600", bg: "bg-slate-50" },
             { title: "Ticket Promedio", value: formatCurrency(stats.avgTicket), icon: ShoppingBag, color: "text-orange-600", bg: "bg-orange-50" }
         ].map((stat, idx) => (
             <Card key={idx} className="p-6 border-none shadow-sm bg-white rounded-xl flex flex-col justify-between relative overflow-hidden group hover:shadow-md transition-all">
@@ -198,6 +216,55 @@ export default function VentasDashboard() {
                             <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-300 hover:text-blue-600 hover:bg-blue-50 opacity-0 group-hover:opacity-100 transition-all">
                                 <Eye className="h-4 w-4" />
                             </Button>
+                        </TableCell>
+                    </TableRow>
+                    ))
+                )}
+            </TableBody>
+            </Table>
+        </div>
+      </Card>
+
+      {/* TABLA DE GASTOS */}
+      <Card className="shadow-sm border-none rounded-xl overflow-hidden bg-white mt-6">
+        <div className="p-6 border-b border-slate-50">
+            <h3 className="font-bold text-lg text-slate-800">Gastos Recientes</h3>
+        </div>
+        <div className="overflow-x-auto">
+            <Table>
+            <TableHeader>
+                <TableRow className="border-b border-slate-100 hover:bg-transparent">
+                    <TableHead className="font-bold text-slate-400">Concepto</TableHead>
+                    <TableHead className="font-bold text-slate-400">Categoría</TableHead>
+                    <TableHead className="font-bold text-slate-400">Sucursal</TableHead>
+                    <TableHead className="font-bold text-slate-400">Autoriza</TableHead>
+                    <TableHead className="text-right font-bold text-slate-400">Monto</TableHead>
+                </TableRow>
+            </TableHeader>
+            <TableBody>
+                {loading ? (
+                    <TableRow className="border-0"><TableCell colSpan={5} className="h-32 text-center text-slate-400"><Loader2 className="animate-spin inline mr-2" /> Cargando...</TableCell></TableRow>
+                ) : expenses.length === 0 ? (
+                    <TableRow className="border-0"><TableCell colSpan={5} className="h-32 text-center text-slate-400">No hay gastos registrados hoy.</TableCell></TableRow>
+                ) : (
+                    expenses.map((expense) => (
+                    <TableRow key={expense.id} className="border-0 hover:bg-slate-50/80 transition-colors">
+                        <TableCell className="font-medium text-slate-700">{expense.concepto}</TableCell>
+                        <TableCell>
+                             <Badge variant="outline" className="text-slate-500 border-slate-200">{expense.categoria}</Badge>
+                        </TableCell>
+                         <TableCell>
+                            <div className="flex items-center gap-2 text-slate-600 text-sm">
+                                <Store className="h-3.5 w-3.5 text-slate-300" /> {expense.sucursal?.nombre || 'General'}
+                            </div>
+                        </TableCell>
+                        <TableCell>
+                            <div className="flex items-center gap-2 text-slate-600 text-sm">
+                                <User className="h-3.5 w-3.5 text-slate-300" /> {expense.user?.nombre}
+                            </div>
+                        </TableCell>
+                        <TableCell className="text-right font-bold text-red-600">
+                            {formatCurrency(expense.monto)}
                         </TableCell>
                     </TableRow>
                     ))

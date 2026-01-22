@@ -7,8 +7,17 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog"
+import {
   ShoppingCartIcon, BookOpen, Search, Loader2, Minus, Plus,
-  Store, Trash2, Percent, CheckCircle2, Candy, ScanBarcode
+  Store, Trash2, Percent, CheckCircle2, Candy, ScanBarcode, ArrowUpRight
 } from "lucide-react"
 import { Sucursal } from "@/lib/types"
 
@@ -49,6 +58,16 @@ export default function PointOfSale() {
   const [selectedSucursal, setSelectedSucursal] = useState<number | null>(null)
   const [paymentMethod, setPaymentMethod] = useState<string>("EFECTIVO")
   const [discountPercent, setDiscountPercent] = useState<number>(0)
+  
+  // Estado para Gastos (Expenses - System Action Plan)
+  const [isExpenseModalOpen, setIsExpenseModalOpen] = useState(false)
+  const [isExpenseSubmitting, setIsExpenseSubmitting] = useState(false)
+  const [newExpense, setNewExpense] = useState({
+    amount: "",
+    concept: "",
+    category: "VARIOS"
+  })
+
   const [lastSale, setLastSale] = useState<{ id: number; total: number } | null>(null)
 
   useEffect(() => {
@@ -85,6 +104,43 @@ export default function PointOfSale() {
     setSearchResults([]);
     setSearchTerm("");
   };
+
+  const handleRegisterExpense = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!selectedSucursal) {
+      alert("Por favor selecciona una sucursal primero")
+      return
+    }
+    
+    setIsExpenseSubmitting(true)
+    try {
+      const res = await fetch('/api/expenses', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          amount: newExpense.amount,
+          concept: newExpense.concept,
+          category: newExpense.category,
+          sucursalId: selectedSucursal,
+          userId: 1 // TODO: Obtener del contexto de auth real
+        })
+      })
+
+      if (res.ok) {
+        alert(`Gasto de $${newExpense.amount} registrado exitosamente.`)
+        setIsExpenseModalOpen(false)
+        setNewExpense({ amount: "", concept: "", category: "VARIOS" })
+      } else {
+        const errorData = await res.json()
+        alert(`Error: ${errorData.error}`)
+      }
+    } catch (error) {
+      console.error(error)
+      alert("Error al registrar el gasto")
+    } finally {
+      setIsExpenseSubmitting(false)
+    }
+  }
 
 
   const handleDiscountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -294,13 +350,84 @@ export default function PointOfSale() {
             <p className="text-sm text-slate-500">
               {selectedSucursal ? `Sucursal: ${sucursales.find(s => s.id === selectedSucursal)?.nombre}` : "Seleccione sucursal"}
             </p>
-            <Button
-              onClick={() => {
-                handleDownload()
-              }}
-            >
-              Descargar Corte del Día
-            </Button>
+            <div className="flex gap-2 items-center">
+               <Button
+                  onClick={handleDownload} 
+               >
+                 Descargar Corte del Día
+               </Button>
+               
+               <Dialog open={isExpenseModalOpen} onOpenChange={setIsExpenseModalOpen}>
+                  <DialogTrigger asChild>
+                    <Button 
+                      variant="outline"
+                      className="bg-white text-primary border-primary hover:bg-slate-50 border"
+                    >
+                      Registrar Gasto
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Registrar Gasto / Egreso</DialogTitle>
+                      <DialogDescription>
+                         Registra una salida de dinero de la caja de la sucursal actual.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <form onSubmit={handleRegisterExpense} className="space-y-4 py-4">
+                        <div className="space-y-2">
+                            <Label htmlFor="concept">Concepto</Label>
+                            <Input 
+                                id="concept"
+                                value={newExpense.concept} 
+                                onChange={e => setNewExpense({...newExpense, concept: e.target.value})}
+                                placeholder="Ej. Pago de Luz, Cloro, Comida" 
+                                required
+                            />
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                                <Label htmlFor="amount">Monto</Label>
+                                <Input 
+                                    id="amount"
+                                    type="number" 
+                                    min="0"
+                                    step="0.01"
+                                    value={newExpense.amount} 
+                                    onChange={e => setNewExpense({...newExpense, amount: e.target.value})}
+                                    placeholder="0.00" 
+                                    className="font-mono"
+                                    required
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="category">Categoría</Label>
+                                <select 
+                                    id="category"
+                                    className="flex h-10 w-full items-center justify-between rounded-md border border-slate-200 bg-white px-3 py-2 text-sm ring-offset-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-950 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                    value={newExpense.category}
+                                    onChange={e => setNewExpense({...newExpense, category: e.target.value})}
+                                >
+                                    <option value="INSUMOS">INSUMOS</option>
+                                    <option value="SERVICIOS">SERVICIOS</option>
+                                    <option value="LIMPIEZA">LIMPIEZA</option>
+                                    <option value="MANTENIMIENTO">MANTENIMIENTO</option>
+                                    <option value="NOMINA">NÓMINA</option>
+                                    <option value="VARIOS">VARIOS</option>
+                                    <option value="MERCANCIA">MERCANCÍA (EXTERNA)</option>
+                                </select>
+                            </div>
+                        </div>
+                        <DialogFooter>
+                            <Button type="button" variant="ghost" onClick={() => setIsExpenseModalOpen(false)}>Cancelar</Button>
+                            <Button type="submit" disabled={isExpenseSubmitting}>
+                                {isExpenseSubmitting ? <Loader2 className="animate-spin mr-2" /> : null}
+                                Registrar Egreso
+                            </Button>
+                        </DialogFooter>
+                    </form>
+                  </DialogContent>
+                </Dialog>
+            </div>
           </div>
           <div className="flex items-center gap-3">
             <Store className="text-slate-400" />
@@ -499,6 +626,68 @@ export default function PointOfSale() {
           </Button>
         </div>
       </aside>
+
+      <Dialog open={isExpenseModalOpen} onOpenChange={setIsExpenseModalOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Registrar Salida de Efectivo</DialogTitle>
+            <DialogDescription>
+              Ingresa los detalles del gasto. Esto se descontará del efectivo en caja.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleRegisterExpense} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="expense-amount">Monto ($)</Label>
+              <Input
+                id="expense-amount"
+                type="number"
+                min="0.01"
+                step="0.01"
+                placeholder="0.00"
+                value={newExpense.amount}
+                onChange={(e) => setNewExpense({ ...newExpense, amount: e.target.value })}
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="expense-concept">Concepto / Descripción</Label>
+              <Input
+                id="expense-concept"
+                placeholder="Ej. Compra de Pinol"
+                value={newExpense.concept}
+                onChange={(e) => setNewExpense({ ...newExpense, concept: e.target.value })}
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="expense-category">Categoría</Label>
+              <select
+                id="expense-category"
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                value={newExpense.category}
+                onChange={(e) => setNewExpense({ ...newExpense, category: e.target.value })}
+              >
+                <option value="VARIOS">Varios</option>
+                <option value="LIMPIEZA">Limpieza</option>
+                <option value="PAPELERIA">Papelería</option>
+                <option value="MANTENIMIENTO">Mantenimiento</option>
+                <option value="INSUMOS">Insumos</option>
+                <option value="ALIMENTOS">Alimentos</option>
+                <option value="TRANSPORTE">Transporte</option>
+                <option value="SERVICIOS">Servicios</option>
+              </select>
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setIsExpenseModalOpen(false)}>
+                Cancelar
+              </Button>
+              <Button type="submit" disabled={isExpenseSubmitting} className="bg-primary hover:bg-primary/90 text-white">
+                {isExpenseSubmitting ? "Guardando..." : "Guardar Gasto"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

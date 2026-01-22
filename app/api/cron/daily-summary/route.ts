@@ -75,7 +75,7 @@ function getMexicoDayRangeUTC() {
   return { startUtc, endUtc, dateDisplay: `${d}/${m}/${y}` };
 }
 
-// --- ENVÍO WHATSAPP ---
+// --- ENVÍO WHATSAPP VENTAS ---
 async function enviarResumenWhatsApp(
   mensajeSucursales: string,
   fecha: string,
@@ -83,7 +83,7 @@ async function enviarResumenWhatsApp(
 ) {
   const token = process.env.WHATSAPP_ACCESS_TOKEN;
   const phoneId = process.env.WHATSAPP_PHONE_NUMBER_ID;
-  const templateName = 'cierre_de_caja'; // Asegúrate que tu plantilla soporte las variables
+  const templateName = 'cierre_de_caja'; 
 
   if (!token || !phoneId) throw new Error("Faltan credenciales de WhatsApp");
 
@@ -120,6 +120,52 @@ async function enviarResumenWhatsApp(
   return Promise.all(envios);
 }
 
+// --- ENVÍO WHATSAPP GASTOS (NUEVO) ---
+async function enviarGastosWhatsApp(
+  fecha: string,
+  detallesGastos: string,
+  totalGastos: string,
+  numeros: string[]
+) {
+  const token = process.env.WHATSAPP_ACCESS_TOKEN;
+  const phoneId = process.env.WHATSAPP_PHONE_NUMBER_ID;
+  const templateName = 'notificacion_gastos'; 
+
+  if (!token || !phoneId) throw new Error("Faltan credenciales de WhatsApp");
+
+  const envios = numeros.map(async (numero) => {
+    const payload = {
+      messaging_product: 'whatsapp',
+      to: numero,
+      type: 'template',
+      template: {
+        name: templateName,
+        language: { code: 'es_MX' },
+        components: [
+          {
+            type: 'body',
+            parameters: [
+              { type: 'text', text: fecha },           // {1} Fecha
+              { type: 'text', text: detallesGastos },  // {2} Gastos (ej. Suc A: Cloro 10)
+              { type: 'text', text: totalGastos }      // {3} Total
+            ]
+          }
+        ]
+      }
+    };
+
+    const res = await fetch(`https://graph.facebook.com/v19.0/${phoneId}/messages`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+
+    return res.ok ? res.json() : Promise.reject(await res.json());
+  });
+
+  return Promise.all(envios);
+}
+
 // --- HANDLER PRINCIPAL ---
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -136,69 +182,119 @@ export async function GET(request: Request) {
 
     console.log(`Consultando ventas entre (UTC): ${startUtc.toISOString()} y ${endUtc.toISOString()}`);
 
-    const ventas = await prisma.sale.findMany({
-      where: {
-        fecha: { 
-            gte: startUtc, 
-            lte: endUtc 
-        },
-        estado: 'COMPLETADA'
-      },
-      include: { sucursal: true }
-    });
+    // Consultamos Ventas y Gastos en paralelo
+    const [ventas, gastos] = await Promise.all([
+        prisma.sale.findMany({
+            where: {
+                fecha: { gte: startUtc, lte: endUtc },
+                estado: 'COMPLETADA'
+            },
+            include: { sucursal: true }
+        }),
+        prisma.expense.findMany({
+            where: {
+                fecha: { gte: startUtc, lte: endUtc }
+            },
+            include: { sucursal: true }
+        })
+    ]);
 
     const destinatarios = ['5214434911529'];
 
-    if (ventas.length === 0) {
+    if (ventas.length === 0 && gastos.length === 0) {
       // Ajuste aquí para pasar la fecha correcta
-      await enviarResumenWhatsApp("Sin ventas hoy", dateDisplay, destinatarios);
-      return NextResponse.json({ message: 'Sin ventas, reporte enviado.' });
+      await enviarResumenWhatsApp("Sin movimientos hoy", dateDisplay, destinatarios);
+      return NextResponse.json({ message: 'Sin movimientos, reporte enviado.' });
     }
 
-    // 1. Estructura de datos: Sucursal -> Métodos -> Monto
-    const desglose: Record<string, { metodos: Record<string, number>, totalSucursal: number }> = {};
-    let granTotal = 0;
+    // --- PROCESAMIENTO DE VENTAS ---
+    // Usamos la lógica original del daily-summary para generar el mensaje de libros
+    if (ventas.length > 0) {
+        const desglose: Record<string, { metodos: Record<string, number>, totalSucursal: number }> = {};
+        let granTotalVentas = 0;
 
-    for (const venta of ventas) {
-      const suc = venta.sucursal?.nombre || 'General';
-      const metodo = String(venta.metodoPago || 'OTRO').replace(/_/g, ' ');
-      const monto = toNumber(venta.montoTotal);
+        for (const venta of ventas) {
+            const suc = venta.sucursal?.nombre || 'General';
+            const metodo = String(venta.metodoPago || 'OTRO').replace(/_/g, ' ');
+            const monto = toNumber(venta.montoTotal);
 
-      if (!desglose[suc]) {
-        desglose[suc] = { metodos: {}, totalSucursal: 0 };
-      }
+            if (!desglose[suc]) {
+                desglose[suc] = { metodos: {}, totalSucursal: 0 };
+            }
 
-      desglose[suc].metodos[metodo] = (desglose[suc].metodos[metodo] || 0) + monto;
-      desglose[suc].totalSucursal += monto;
-      granTotal += monto;
+            desglose[suc].metodos[metodo] = (desglose[suc].metodos[metodo] || 0) + monto;
+            desglose[suc].totalSucursal += monto;
+            granTotalVentas += monto;
+        }
+
+        let partesMensaje: string[] = [];
+
+        for (const [nombreSuc, data] of Object.entries(desglose)) {
+            const detallesMetodos = Object.entries(data.metodos)
+                .map(([m, total]) => `${m}: ${formatCurrency(total)}`)
+                .join(", ");
+            
+            partesMensaje.push(`${nombreSuc} [${detallesMetodos} | Subtotal: ${formatCurrency(data.totalSucursal)}]`);
+        }
+
+        let mensajeTexto = partesMensaje.join("  /  ");
+        mensajeTexto += `  ||  💰 TOTAL GENERAL: ${formatCurrency(granTotalVentas)}`;
+
+        await enviarResumenWhatsApp(
+            mensajeTexto, 
+            dateDisplay,
+            destinatarios
+        );
+    } else {
+        // Si hay gastos pero no ventas, enviamos aviso de "Sin ventas" para cumplir con el reporte
+        await enviarResumenWhatsApp("Sin ventas hoy", dateDisplay, destinatarios);
     }
 
-    // 2. Construcción del mensaje lineal
-    let partesMensaje: string[] = [];
+    // --- PROCESAMIENTO DE GASTOS (NUEVA PLANTILLA) ---
+    if (gastos.length > 0) {
+        const gastosPorSucursal: Record<string, { descripciones: string[], total: number }> = {};
+        let granTotalGastos = 0;
 
-    for (const [nombreSuc, data] of Object.entries(desglose)) {
-      const detallesMetodos = Object.entries(data.metodos)
-        .map(([m, total]) => `${m}: ${formatCurrency(total)}`)
-        .join(", ");
-       
-      partesMensaje.push(`${nombreSuc} [${detallesMetodos} | Subtotal: ${formatCurrency(data.totalSucursal)}]`);
+        for (const gasto of gastos) {
+            const suc = gasto.sucursal?.nombre || 'General';
+            const monto = toNumber(gasto.monto);
+            granTotalGastos += monto;
+
+            if (!gastosPorSucursal[suc]) {
+                gastosPorSucursal[suc] = { descripciones: [], total: 0 };
+            }
+            
+            // Ejemplo formato item: "Cloro ($45)"
+            gastosPorSucursal[suc].descripciones.push(`${gasto.concepto} (${formatCurrency(monto)})`);
+            gastosPorSucursal[suc].total += monto;
+        }
+
+        // Construir string de detalles sin saltos de línea (usando separadores visuales)
+        let detallesGastosArr: string[] = [];
+        
+        for (const [suc, data] of Object.entries(gastosPorSucursal)) {
+            // Ejemplo: "Sucursal Centro: Cloro ($45), Escobas ($100)"
+            const items = data.descripciones.join(", ");
+            detallesGastosArr.push(`${suc}: ${items}`);
+        }
+
+        // Unir todo con un separador claro
+        const textoDetalles = detallesGastosArr.join(" || "); 
+        const totalTexto = formatCurrency(granTotalGastos);
+        
+        await enviarGastosWhatsApp(
+            dateDisplay, 
+            textoDetalles, 
+            totalTexto,
+            destinatarios
+        );
     }
-
-    let mensajeTexto = partesMensaje.join("  /  ");
-    mensajeTexto += `  ||  💰 TOTAL GENERAL: ${formatCurrency(granTotal)}`;
-
-    // 3. Envío
-    await enviarResumenWhatsApp(
-        mensajeTexto, 
-        dateDisplay, // Usamos la fecha calculada de México
-        destinatarios
-    );
 
     return NextResponse.json({ 
       success: true, 
-      message: 'Cierre con desglose enviado',
-      debugRange: { start: startUtc, end: endUtc }, // Útil para que verifiques en la respuesta
-      data: desglose
+      message: 'Reportes enviados (Ventas y Gastos gestionados por separado)',
+      debugRange: { start: startUtc, end: endUtc },
+      data: { ventasCount: ventas.length, gastosCount: gastos.length }
     });
 
   } catch (error) {
