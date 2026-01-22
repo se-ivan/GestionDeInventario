@@ -19,6 +19,8 @@ import {
   XCircle,
   Eye,
   Edit,
+  Trash2,
+  Check,
   Users,
   Loader2,
 } from "lucide-react"
@@ -33,7 +35,7 @@ interface PendingSearch {
   editorial: string
   genero: string
   descripcion: string
-  precio_estimado: number
+  precio_estimado: number | null
   cliente_nombre: string
   cliente_telefono: string
   cliente_email: string
@@ -72,6 +74,11 @@ export default function PendingSearchesPage() {
   const pathname = usePathname()
 
   const [isNewSearchOpen, setIsNewSearchOpen] = useState(false)
+  const [editingId, setEditingId] = useState<number | null>(null)
+  
+  const [isViewOpen, setIsViewOpen] = useState(false)
+  const [viewSearch, setViewSearch] = useState<PendingSearch | null>(null)
+
   const [newSearch, setNewSearch] = useState({
     titulo: "",
     autor: "",
@@ -84,11 +91,98 @@ export default function PendingSearchesPage() {
     precio_estimado: "",
     cliente_email: "",
     cliente_notas: "",
+    estado: "pendiente",
     prioridad: "media",
   })
 
   const [isSearching, setIsSearching] = useState(false)
   const [searchError, setSearchError] = useState<string | null>(null)
+
+  // Confirmation/Alert Modals
+  const [deleteDialog, setDeleteDialog] = useState<{isOpen: boolean, id: number | null}>({ isOpen: false, id: null });
+  const [alertDialog, setAlertDialog] = useState<{isOpen: boolean, title: string, message: string}>({ isOpen: false, title: '', message: '' });
+
+  const resetForm = () => {
+    setNewSearch({
+      titulo: "",
+      autor: "",
+      cliente_nombre: "",
+      cliente_telefono: "",
+      isbn: "",
+      editorial: "",
+      genero: "",
+      descripcion: "",
+      precio_estimado: "",
+      cliente_email: "",
+      cliente_notas: "",
+      estado: "pendiente",
+      prioridad: "media",
+    })
+    setEditingId(null)
+  }
+
+  const handleEdit = (search: PendingSearch) => {
+    setNewSearch({
+      titulo: search.titulo,
+      autor: search.autor,
+      cliente_nombre: search.cliente_nombre,
+      cliente_telefono: search.cliente_telefono,
+      isbn: search.isbn || "",
+      editorial: search.editorial || "",
+      genero: search.genero || "",
+      descripcion: search.descripcion || "",
+      precio_estimado: search.precio_estimado ? search.precio_estimado.toString() : "",
+      cliente_email: search.cliente_email || "",
+      cliente_notas: search.cliente_notas || "",
+      estado: search.estado,
+      prioridad: search.prioridad,
+    })
+    setEditingId(search.id)
+    setIsNewSearchOpen(true)
+  }
+
+  const handleDeleteClick = (id: number) => {
+    setDeleteDialog({ isOpen: true, id });
+  }
+
+  const confirmDelete = async () => {
+    if (!deleteDialog.id) return;
+
+    try {
+      const response = await fetch(`/api/pending-searches/${deleteDialog.id}`, {
+        method: "DELETE",
+      })
+      if (response.ok) {
+        fetchPendingSearches()
+        setDeleteDialog({ isOpen: false, id: null });
+      } else {
+        setAlertDialog({ isOpen: true, title: "Error", message: "Error al eliminar la búsqueda" });
+      }
+    } catch (error) {
+      console.error("Error deleting search:", error)
+      setAlertDialog({ isOpen: true, title: "Error", message: "Error de conexión al eliminar" });
+    }
+  }
+
+  const handleMarkAsFound = async (search: PendingSearch) => {
+    try {
+      const response = await fetch(`/api/pending-searches/${search.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...search, estado: "encontrado" }),
+      })
+      if (response.ok) {
+        fetchPendingSearches()
+      }
+    } catch (error) {
+      console.error("Error updating status:", error)
+    }
+  }
+
+  const handleView = (search: PendingSearch) => {
+    setViewSearch(search)
+    setIsViewOpen(true)
+  }
 
   const handleSmartSearch = async () => {
     if (!newSearch.isbn) return
@@ -130,31 +224,22 @@ export default function PendingSearchesPage() {
   const handleCreateSearch = async (e: React.FormEvent) => {
     e.preventDefault()
     try {
-      const response = await fetch("/api/pending-searches", {
-        method: "POST",
+      const url = editingId ? `/api/pending-searches/${editingId}` : "/api/pending-searches"
+      const method = editingId ? "PUT" : "POST"
+
+      const response = await fetch(url, {
+        method: method,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(newSearch),
       })
+      
       if (response.ok) {
         setIsNewSearchOpen(false)
         fetchPendingSearches()
-        setNewSearch({
-            titulo: "",
-            autor: "",
-            cliente_nombre: "",
-            cliente_telefono: "",
-            isbn: "",
-            editorial: "",
-            genero: "",
-            descripcion: "",
-            precio_estimado: "",
-            cliente_email: "",
-            cliente_notas: "",
-            prioridad: "media",
-        })
+        resetForm()
       }
     } catch (error) {
-      console.error("Error creating search:", error)
+      console.error("Error creating/updating search:", error)
     }
   }
 
@@ -331,7 +416,7 @@ export default function PendingSearchesPage() {
           </select>
 
           <Button 
-            className="bg-blue-600 hover:bg-blue-700" 
+            className="bg-primary hover:bg-primary/90 text-white" 
             onClick={() => setIsNewSearchOpen(true)}
           >
             <Plus className="h-4 w-4 mr-2" />
@@ -395,7 +480,7 @@ export default function PendingSearchesPage() {
                       </div>
                       <div className="flex justify-between">
                         <span className="text-slate-600">Precio estimado:</span>
-                        <span className="font-medium">€{search.precio_estimado}</span>
+                        <span className="font-medium">${search.precio_estimado}</span>
                       </div>
                       {search.fecha_limite && (
                         <div className="flex justify-between">
@@ -418,13 +503,44 @@ export default function PendingSearchesPage() {
 
                     {/* Actions */}
                     <div className="flex gap-2 pt-2">
-                      <Button variant="outline" size="sm" className="flex-1 bg-transparent">
+                      <Button 
+                         size="sm" 
+                         className="flex-1 bg-primary text-white hover:bg-primary/90"
+                         onClick={() => handleView(search)}
+                         title="Ver detalles"
+                      >
                         <Eye className="h-3 w-3 mr-1" />
                         Ver
                       </Button>
-                      <Button variant="outline" size="sm" className="flex-1 bg-transparent">
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="flex-1 bg-transparent"
+                        onClick={() => handleEdit(search)}
+                        title="Editar búsqueda"
+                      >
                         <Edit className="h-3 w-3 mr-1" />
                         Editar
+                      </Button>
+                      {search.estado !== "encontrado" && search.estado !== "entregado" && (
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          className="bg-green-50 text-green-600 hover:bg-green-100 border-green-200"
+                          onClick={() => handleMarkAsFound(search)}
+                          title="Marcar como encontrado"
+                        >
+                          <Check className="h-3 w-3" />
+                        </Button>
+                      )}
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="bg-red-50 text-red-600 hover:bg-red-100 border-red-200"
+                        onClick={() => handleDeleteClick(search.id)}
+                        title="Eliminar"
+                      >
+                        <Trash2 className="h-3 w-3" />
                       </Button>
                     </div>
                   </div>
@@ -454,12 +570,15 @@ export default function PendingSearchesPage() {
           </div>
         )}
 
-        <Dialog open={isNewSearchOpen} onOpenChange={setIsNewSearchOpen}>
+        <Dialog open={isNewSearchOpen} onOpenChange={(open) => {
+          setIsNewSearchOpen(open)
+          if (!open) resetForm()
+        }}>
             <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
-                <DialogTitle>Registrar Búsqueda de Libro</DialogTitle>
+                <DialogTitle>{editingId ? "Editar Búsqueda" : "Registrar Búsqueda de Libro"}</DialogTitle>
                 <DialogDescription>
-                  Ingresa los detalles del libro y la información de contacto del cliente.
+                  {editingId ? "Modifica los detalles de la búsqueda existente." : "Ingresa los detalles del libro y la información de contacto del cliente."}
                 </DialogDescription>
               </DialogHeader>
               <form onSubmit={handleCreateSearch} className="grid gap-4 py-4">
@@ -585,6 +704,25 @@ export default function PendingSearchesPage() {
                       </select>
                     </div>
                   </div>
+                  
+                  {editingId && (
+                    <div className="grid gap-2 mt-4">
+                      <Label htmlFor="estado">Estado</Label>
+                      <select
+                        id="estado"
+                        className="flex h-10 w-full items-center justify-between rounded-md border border-slate-200 bg-white px-3 py-2 text-sm ring-offset-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-950 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                        value={newSearch.estado || "pendiente"}
+                        onChange={(e) => setNewSearch({ ...newSearch, estado: e.target.value })}
+                      >
+                       <option value="pendiente">Pendiente</option>
+                       <option value="buscando">Buscando</option>
+                       <option value="encontrado">Encontrado</option>
+                       <option value="entregado">Entregado</option>
+                       <option value="cancelado">Cancelado</option>
+                      </select>
+                    </div>
+                  )}
+
                   <div className="grid gap-2 mt-4">
                     <Label htmlFor="cliente_notas">Notas del Cliente</Label>
                     <Input
@@ -596,11 +734,147 @@ export default function PendingSearchesPage() {
                 </div>
 
                 <DialogFooter>
-                  <Button type="submit">Guardar Búsqueda</Button>
+                  <Button type="submit">{editingId ? "Actualizar" : "Guardar Búsqueda"}</Button>
                 </DialogFooter>
               </form>
             </DialogContent>
           </Dialog>
+
+          <Dialog open={isViewOpen} onOpenChange={setIsViewOpen}>
+            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+              {viewSearch && (
+                <>
+                  <DialogHeader>
+                    <div className="flex justify-between items-start pr-8">
+                      <div>
+                        <DialogTitle className="text-xl">{viewSearch.titulo}</DialogTitle>
+                        <DialogDescription className="text-base font-medium text-slate-700 mt-1">
+                          {viewSearch.autor}
+                        </DialogDescription>
+                      </div>
+                    </div>
+                  </DialogHeader>
+
+                  <div className="grid gap-6 py-4">
+                    <div className="flex gap-2">
+                       <Badge className={`${estadoConfig[viewSearch.estado].color} px-3 py-1`}>
+                          {estadoConfig[viewSearch.estado].label}
+                       </Badge>
+                       <Badge className={`${prioridadConfig[viewSearch.prioridad].color} px-3 py-1`}>
+                          {prioridadConfig[viewSearch.prioridad].label}
+                       </Badge>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4 border p-4 rounded-lg bg-slate-50">
+                       <div>
+                          <Label className="text-xs text-slate-500 uppercase font-semibold">ISBN</Label>
+                          <p className="font-mono text-sm">{viewSearch.isbn || "N/A"}</p>
+                       </div>
+                       <div>
+                          <Label className="text-xs text-slate-500 uppercase font-semibold">Editorial</Label>
+                          <p className="text-sm">{viewSearch.editorial || "N/A"}</p>
+                       </div>
+                       <div>
+                          <Label className="text-xs text-slate-500 uppercase font-semibold">Género</Label>
+                          <p className="text-sm">{viewSearch.genero || "N/A"}</p>
+                       </div>
+                       <div>
+                          <Label className="text-xs text-slate-500 uppercase font-semibold">Precio Estimado</Label>
+                          <p className="text-sm font-semibold">${viewSearch.precio_estimado}</p>
+                       </div>
+                    </div>
+
+                    {viewSearch.descripcion && (
+                      <div>
+                        <Label className="text-xs text-slate-500 uppercase font-semibold mb-1 block">Descripción / Notas</Label>
+                        <p className="text-sm text-slate-700 leading-relaxed bg-white border p-3 rounded">
+                          {viewSearch.descripcion}
+                        </p>
+                      </div>
+                    )}
+
+                    <div className="border-t pt-4">
+                      <h4 className="text-sm font-semibold mb-3 flex items-center gap-2">
+                        <Users className="h-4 w-4" /> Información del Cliente
+                      </h4>
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div className="md:col-span-1">
+                           <Label className="text-xs text-slate-500 uppercase">Nombre</Label>
+                           <p className="font-medium text-sm">{viewSearch.cliente_nombre}</p>
+                        </div>
+                        <div className="md:col-span-1">
+                           <Label className="text-xs text-slate-500 uppercase">Teléfono</Label>
+                           <p className="text-sm flex items-center gap-1">
+                             <Phone className="h-3 w-3 text-slate-400" /> {viewSearch.cliente_telefono}
+                           </p>
+                        </div>
+                         <div className="md:col-span-1">
+                           <Label className="text-xs text-slate-500 uppercase">Email</Label>
+                           <p className="text-sm flex items-center gap-1">
+                              <Mail className="h-3 w-3 text-slate-400" /> {viewSearch.cliente_email || "No registrado"}
+                           </p>
+                        </div>
+                      </div>
+                      {viewSearch.cliente_notas && (
+                        <div className="mt-3">
+                           <Label className="text-xs text-slate-500 uppercase">Notas Cliente</Label>
+                           <p className="text-sm text-slate-600 bg-yellow-50 p-2 rounded border border-yellow-100 mt-1">
+                             {viewSearch.cliente_notas}
+                           </p>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="flex justify-between items-center text-xs text-slate-400 border-t pt-4">
+                      <span>ID: #{viewSearch.id}</span>
+                      <span>Solicitado: {new Date(viewSearch.fecha_solicitud).toLocaleDateString()}</span>
+                    </div>
+                  </div>
+
+                  <DialogFooter className="gap-2 sm:gap-0">
+                    <Button variant="secondary" onClick={() => setIsViewOpen(false)}>
+                      Cerrar
+                    </Button>
+                    <Button onClick={() => { setIsViewOpen(false); handleEdit(viewSearch); }}>
+                      <Edit className="h-4 w-4 mr-2" />
+                      Editar Solicitud
+                    </Button>
+                  </DialogFooter>
+                </>
+              )}
+            </DialogContent>
+          </Dialog>
+
+      {/* DELETE CONFIRMATION MODAL */}
+      <Dialog open={deleteDialog.isOpen} onOpenChange={(open) => setDeleteDialog(prev => ({ ...prev, isOpen: open }))}>
+        <DialogContent>
+            <DialogHeader>
+                <DialogTitle>Confirmar Eliminación</DialogTitle>
+                <DialogDescription>
+                    ¿Estás seguro de que deseas eliminar esta búsqueda? Esta acción no se puede deshacer.
+                </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+                <Button variant="outline" onClick={() => setDeleteDialog({ isOpen: false, id: null })}>Cancelar</Button>
+                <Button variant="destructive" onClick={confirmDelete}>Eliminar</Button>
+            </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ALERT MODAL */}
+      <Dialog open={alertDialog.isOpen} onOpenChange={(open) => setAlertDialog(prev => ({ ...prev, isOpen: open }))}>
+        <DialogContent>
+            <DialogHeader>
+                <DialogTitle>{alertDialog.title}</DialogTitle>
+                <DialogDescription>
+                    {alertDialog.message}
+                </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+                <Button onClick={() => setAlertDialog(prev => ({ ...prev, isOpen: false }))}>Entendido</Button>
+            </DialogFooter>
+        </DialogContent>
+      </Dialog>
       </main>
     </div>
   )

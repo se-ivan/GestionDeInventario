@@ -39,6 +39,10 @@ export default function ExpensesPage() {
   const [currentExpense, setCurrentExpense] = useState<any>(null)
   const [isSubmiting, setIsSubmiting] = useState(false)
 
+  // Confirmation/Alert Modals
+  const [deleteDialog, setDeleteDialog] = useState<{isOpen: boolean, id: number | null}>({ isOpen: false, id: null });
+  const [alertDialog, setAlertDialog] = useState<{isOpen: boolean, title: string, message: string}>({ isOpen: false, title: '', message: '' });
+
   const fetchExpenses = async () => {
     setLoading(true)
     try {
@@ -62,13 +66,23 @@ export default function ExpensesPage() {
     fetchExpenses()
   }, [dateFilter])
 
-  const handleDelete = async (id: number) => {
-    if (!confirm("¿Confirma eliminar este registro?")) return;
+  const handleDeleteClick = (id: number) => {
+    setDeleteDialog({ isOpen: true, id });
+  }
+
+  const confirmDelete = async () => {
+    if (!deleteDialog.id) return;
     try {
-        const res = await fetch(`/api/expenses/${id}`, { method: 'DELETE' });
-        if(res.ok) fetchExpenses();
-        else alert("Error al eliminar");
-    } catch(e) { alert("Error de conexión"); }
+        const res = await fetch(`/api/expenses/${deleteDialog.id}`, { method: 'DELETE' });
+        if(res.ok) {
+            fetchExpenses();
+            setDeleteDialog({ isOpen: false, id: null });
+        } else {
+            setAlertDialog({ isOpen: true, title: "Error", message: "Error al eliminar el registro" });
+        }
+    } catch(e) { 
+        setAlertDialog({ isOpen: true, title: "Error", message: "Error de conexión al eliminar" });
+    }
   }
 
   const handleEdit = (expense: Expense) => {
@@ -81,17 +95,32 @@ export default function ExpensesPage() {
     setIsModalOpen(true);
   }
 
+  const handleNewExpense = () => {
+    setCurrentExpense({
+        id: null,
+        concepto: "",
+        monto: "",
+        categoria: "VARIOS"
+    });
+    setIsModalOpen(true);
+  }
+
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmiting(true);
     try {
-        const res = await fetch(`/api/expenses/${currentExpense.id}`, {
-            method: 'PATCH',
+        const isEditing = !!currentExpense.id;
+        const url = isEditing ? `/api/expenses/${currentExpense.id}` : '/api/expenses';
+        const method = isEditing ? 'PATCH' : 'POST';
+
+        const res = await fetch(url, {
+            method: method,
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 concepto: currentExpense.concepto,
                 monto: currentExpense.monto,
-                categoria: currentExpense.categoria
+                categoria: currentExpense.categoria,
+                // userId and sucursalId are handled by backend defaults for now, or could be added here
             })
         });
 
@@ -99,10 +128,10 @@ export default function ExpensesPage() {
             setIsModalOpen(false);
             fetchExpenses();
         } else {
-            alert("Error al guardar cambios");
+            setAlertDialog({ isOpen: true, title: "Error", message: "No se pudieron guardar los cambios" });
         }
     } catch(e) {
-        alert("Error de conexión");
+        setAlertDialog({ isOpen: true, title: "Error", message: "Error de conexión al guardar" });
     } finally {
         setIsSubmiting(false);
     }
@@ -132,6 +161,9 @@ export default function ExpensesPage() {
             </div>
             <Button onClick={fetchExpenses} variant="outline" className="gap-2 bg-white hover:bg-slate-50">
                 <TrendingUp className="w-4 h-4" /> Actualizar
+            </Button>
+            <Button onClick={handleNewExpense} className="gap-2 bg-primary text-white hover:bg-primary/90">
+                <Plus className="w-4 h-4" /> Nuevo Gasto
             </Button>
         </div>
       </div>
@@ -206,7 +238,7 @@ export default function ExpensesPage() {
                             <Button variant="ghost" size="icon" onClick={() => handleEdit(expense)} className="h-8 w-8 text-slate-400 hover:text-blue-600">
                                 <Pencil className="h-4 w-4" />
                             </Button>
-                            <Button variant="ghost" size="icon" onClick={() => handleDelete(expense.id)} className="h-8 w-8 text-slate-400 hover:text-red-600">
+                            <Button variant="ghost" size="icon" onClick={() => handleDeleteClick(expense.id)} className="h-8 w-8 text-slate-400 hover:text-red-600">
                                 <Trash2 className="h-4 w-4" />
                             </Button>
                         </TableCell>
@@ -222,8 +254,10 @@ export default function ExpensesPage() {
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
         <DialogContent>
             <DialogHeader>
-                <DialogTitle>Editar Gasto</DialogTitle>
-                <DialogDescription>Modificar detalles del registro seleccionado.</DialogDescription>
+                <DialogTitle>{currentExpense?.id ? "Editar Gasto" : "Registrar Nuevo Gasto"}</DialogTitle>
+                <DialogDescription>
+                    {currentExpense?.id ? "Modificar detalles del registro seleccionado." : "Ingresa la información del nuevo gasto a registrar."}
+                </DialogDescription>
             </DialogHeader>
             {currentExpense && (
                 <form onSubmit={handleSave} className="space-y-4 py-4">
@@ -272,6 +306,37 @@ export default function ExpensesPage() {
                     </DialogFooter>
                 </form>
             )}
+        </DialogContent>
+      </Dialog>
+
+      {/* DELETE CONFIRMATION MODAL */}
+      <Dialog open={deleteDialog.isOpen} onOpenChange={(open) => setDeleteDialog(prev => ({ ...prev, isOpen: open }))}>
+        <DialogContent>
+            <DialogHeader>
+                <DialogTitle>Confirmar Eliminación</DialogTitle>
+                <DialogDescription>
+                    ¿Estás seguro de que deseas eliminar este registro de gasto? Esta acción no se puede deshacer.
+                </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+                <Button variant="outline" onClick={() => setDeleteDialog({ isOpen: false, id: null })}>Cancelar</Button>
+                <Button variant="destructive" onClick={confirmDelete}>Eliminar</Button>
+            </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ALERT MODAL */}
+      <Dialog open={alertDialog.isOpen} onOpenChange={(open) => setAlertDialog(prev => ({ ...prev, isOpen: open }))}>
+        <DialogContent>
+            <DialogHeader>
+                <DialogTitle>{alertDialog.title}</DialogTitle>
+                <DialogDescription>
+                    {alertDialog.message}
+                </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+                <Button onClick={() => setAlertDialog(prev => ({ ...prev, isOpen: false }))}>Entendido</Button>
+            </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

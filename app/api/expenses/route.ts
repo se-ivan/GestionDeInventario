@@ -4,16 +4,16 @@ import  prisma  from '@/lib/prisma';
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { amount, concept, category, userId, sucursalId } = body;
+    const { monto, concepto, categoria, userId, sucursalId } = body;
 
     // Validación básica
-    if (!amount || Number(amount) <= 0) {
+    if (!monto || Number(monto) <= 0) {
       return NextResponse.json(
         { error: 'El monto debe ser mayor a 0' },
         { status: 400 }
       );
     }
-    if (!concept) {
+    if (!concepto) {
       return NextResponse.json(
         { error: 'El concepto es obligatorio' },
         { status: 400 }
@@ -28,9 +28,9 @@ export async function POST(request: Request) {
     const [expense, notification] = await prisma.$transaction([
       prisma.expense.create({
         data: {
-          monto: parseFloat(amount),
-          concepto: concept,
-          categoria: category || 'VARIOS',
+          monto: parseFloat(monto),
+          concepto: concepto,
+          categoria: categoria || 'VARIOS',
           userId: finalUserId,
           sucursalId: finalSucursalId,
           fecha: new Date(),
@@ -39,7 +39,7 @@ export async function POST(request: Request) {
       prisma.notification.create({
         data: {
           type: 'GASTO',
-          message: `Nuevo gasto registrado: $${amount} - ${concept} (${category})`,
+          message: `Nuevo gasto registrado: ${concepto} - $${monto}`,
         },
       }),
     ]);
@@ -62,20 +62,28 @@ export async function GET(request: Request) {
      // Filtro opcional por fecha (útil para el reporte diario)
      const whereClause: any = {};
      if (date) {
+        // Ajuste de zona horaria para México (UTC-6)
+        // Buscamos desde las 06:00 UTC del día seleccionado hasta las 06:00 UTC del día siguiente
         const start = new Date(date);
-        start.setHours(0, 0, 0, 0);
+        start.setUTCHours(6, 0, 0, 0);
+        
         const end = new Date(date);
-        end.setHours(23, 59, 59, 999);
+        end.setDate(end.getDate() + 1);
+        end.setUTCHours(6, 0, 0, 0); // Usamos < end, o continuamos con lte 5:59
+
         whereClause.fecha = {
            gte: start,
-           lte: end
+           lt: end 
         };
      }
 
      const expenses = await prisma.expense.findMany({
         where: whereClause,
         orderBy: { fecha: 'desc' },
-        include: { user: { select: { nombre: true } } }
+        include: { 
+            user: { select: { nombre: true } },
+            sucursal: { select: { nombre: true } }
+        }
      });
 
      return NextResponse.json(expenses);

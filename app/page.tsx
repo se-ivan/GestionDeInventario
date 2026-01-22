@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/dialog"
 import {
   ShoppingCartIcon, BookOpen, Search, Loader2, Minus, Plus,
-  Store, Trash2, Percent, CheckCircle2, Candy, ScanBarcode, ArrowUpRight
+  Store, Trash2, Percent, CheckCircle2, Candy, ScanBarcode, ArrowUpRight, AlertCircle
 } from "lucide-react"
 import { Sucursal } from "@/lib/types"
 
@@ -68,6 +68,14 @@ export default function PointOfSale() {
     category: "VARIOS"
   })
 
+  // Feedback Modal State
+  const [feedbackModal, setFeedbackModal] = useState<{
+    isOpen: boolean;
+    type: 'success' | 'error';
+    title: string;
+    message: string;
+  }>({ isOpen: false, type: 'success', title: '', message: '' })
+
   const [lastSale, setLastSale] = useState<{ id: number; total: number } | null>(null)
 
   useEffect(() => {
@@ -108,7 +116,12 @@ export default function PointOfSale() {
   const handleRegisterExpense = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!selectedSucursal) {
-      alert("Por favor selecciona una sucursal primero")
+      setFeedbackModal({
+        isOpen: true,
+        type: 'error',
+        title: 'Atención',
+        message: 'Por favor selecciona una sucursal primero para registrar el gasto.'
+      })
       return
     }
     
@@ -118,25 +131,40 @@ export default function PointOfSale() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          amount: newExpense.amount,
-          concept: newExpense.concept,
-          category: newExpense.category,
+          monto: newExpense.amount,
+          concepto: newExpense.concept,
+          categoria: newExpense.category,
           sucursalId: selectedSucursal,
-          userId: 1 // TODO: Obtener del contexto de auth real
+          userId: 1 
         })
       })
 
       if (res.ok) {
-        alert(`Gasto de $${newExpense.amount} registrado exitosamente.`)
+        setFeedbackModal({
+          isOpen: true,
+          type: 'success',
+          title: '¡Registro Exitoso!',
+          message: `El gasto de $${newExpense.amount} ha sido guardado correctamente.`
+        })
         setIsExpenseModalOpen(false)
         setNewExpense({ amount: "", concept: "", category: "VARIOS" })
       } else {
         const errorData = await res.json()
-        alert(`Error: ${errorData.error}`)
+        setFeedbackModal({
+          isOpen: true,
+          type: 'error',
+          title: 'Error al Guardar',
+          message: errorData.error || 'Hubo un problema al procesar la solicitud.'
+        })
       }
     } catch (error) {
       console.error(error)
-      alert("Error al registrar el gasto")
+      setFeedbackModal({
+        isOpen: true,
+        type: 'error',
+        title: 'Error de Red',
+        message: 'No se pudo conectar con el servidor.'
+      })
     } finally {
       setIsExpenseSubmitting(false)
     }
@@ -686,6 +714,34 @@ export default function PointOfSale() {
               </Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* MODAL DE FEEDBACK (ÉXITO/ERROR) */}
+      <Dialog open={feedbackModal.isOpen} onOpenChange={(open) => setFeedbackModal(prev => ({ ...prev, isOpen: open }))}>
+        <DialogContent className="sm:max-w-md border-0 shadow-lg">
+          <DialogHeader className="items-center pb-2">
+            <div className={`flex h-16 w-16 items-center justify-center rounded-full ${feedbackModal.type === 'success' ? 'bg-emerald-100' : 'bg-red-100'} mb-4`}>
+              {feedbackModal.type === 'success' ? (
+                <CheckCircle2 className="h-8 w-8 text-emerald-600" />
+              ) : (
+                <AlertCircle className="h-8 w-8 text-red-600" />
+              )}
+            </div>
+            <DialogTitle className="text-center text-xl font-bold text-slate-800">{feedbackModal.title}</DialogTitle>
+            <DialogDescription className="text-center text-slate-500 text-base pt-1">
+              {feedbackModal.message}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="sm:justify-center pt-2">
+            <Button 
+              type="button" 
+              className={`w-full sm:w-auto min-w-[140px] font-bold ${feedbackModal.type === 'success' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-red-600 hover:bg-red-700'}`}
+              onClick={() => setFeedbackModal(prev => ({ ...prev, isOpen: false }))}
+            >
+              Entendido
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
