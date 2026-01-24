@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { BookOpen, ShoppingCart, Package, BarChart3, Book, Candy, DollarSign, LogOut, Shield } from "lucide-react"
+import { BookOpen, ShoppingCart, Package, BarChart3, Book, Candy, DollarSign, LogOut, Shield, User } from "lucide-react"
 import { logout } from "@/actions/logout"
 import { useSession } from "next-auth/react"
 
@@ -90,7 +90,16 @@ export function SidebarNav() {
             </Link>
         )}
       </div>
-      <div className="mt-auto pb-4">
+      <div className="mt-auto flex flex-col items-center space-y-4 pb-4">
+        <Link
+          href="/profile"
+          className={`p-3 rounded-lg transition-colors ${
+            pathname === "/profile" ? "bg-blue-100 text-blue-600" : "text-slate-500 hover:bg-slate-100"
+          }`}
+          title="Mi Perfil"
+        >
+          <User className="h-6 w-6" />
+        </Link>
         <button
             onClick={() => logout()}
             className="p-3 rounded-lg text-slate-500 hover:bg-slate-100 hover:text-red-600 transition-colors"
