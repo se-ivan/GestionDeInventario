@@ -55,7 +55,7 @@ export const LoginForm = () => {
                             {...register("email")}
                             id="email"
                             disabled={isPending}
-                            placeholder="john.doe@example.com"
+                            placeholder="nombre@elcolegioinvisible.com"
                             type="email"
                         />
                         {errors.email && (
