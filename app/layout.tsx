@@ -4,6 +4,7 @@ import { GeistMono } from "geist/font/mono"
 import { Analytics } from "@vercel/analytics/next"
 import { MainLayout } from "@/components/main-layout"
 import { SessionProvider } from "next-auth/react"
+import { auth } from "@/auth"
 import "./globals.css"
 
 export const metadata: Metadata = {
@@ -22,14 +23,15 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children
 }: Readonly<{
   children: React.ReactNode
 }>) {
+  const session = await auth();
 
   return (
-    <SessionProvider>
+    <SessionProvider session={session}>
     <html lang="es">
       <body className={`font-sans ${GeistSans.variable} ${GeistMono.variable}`}>
         <MainLayout>
