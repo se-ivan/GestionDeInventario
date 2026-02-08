@@ -103,6 +103,9 @@ export default function PointOfSale() {
             const data = await res.json()
             if (data.active) {
                 setCashSession(data.data)
+                if (data.data.sucursalId) {
+                  setSelectedSucursal(data.data.sucursalId);
+                }
                 setIsOpenSessionModalOpen(false)
             } else {
                 setCashSession(null)
@@ -296,8 +299,20 @@ export default function PointOfSale() {
     window.open(`/api/reporte?date=${localDate}`, '_blank');
   };
 
-  const handleSearch = async (e: React.FormEvent) => {
-    e.preventDefault()
+  // Efecto DEBOUNCE para búsqueda automática
+  useEffect(() => {
+     const timer = setTimeout(() => {
+        if (searchTerm.trim() && selectedSucursal) {
+           executeSearch();
+        } else if (searchTerm.trim() === "") {
+           setSearchResults([]);
+        }
+     }, 400); // 400ms delay
+
+     return () => clearTimeout(timer);
+  }, [searchTerm, selectedSucursal]);    
+
+  const executeSearch = async () => {
     if (!searchTerm.trim() || !selectedSucursal) return
 
     setIsLoading(true)
@@ -316,18 +331,20 @@ export default function PointOfSale() {
         const books = await resBooks.json();
         books.forEach((book: any) => {
           const inv = book.inventario.find((i: any) => i.sucursalId === selectedSucursal);
-          if (inv) {
+          const stock = inv ? inv.stock : 0;
+          // Filtro: Solo mostrar si hay stock > 0
+          if (stock > 0) {
             results.push({
-              uniqueId: `book-${book.id}`,
-              id: book.id,
-              type: 'BOOK',
-              titulo: book.titulo,
-              subtitulo: book.autor,
-              precio: Number(book.precioVenta),
-              stock: inv.stock,
-              ubicacion: inv.ubicacion,
-              sucursalId: inv.sucursalId,
-              rawBook: book
+                uniqueId: `book-${book.id}`,
+                id: book.id,
+                type: 'BOOK',
+                titulo: book.titulo,
+                subtitulo: book.autor,
+                precio: Number(book.precioVenta),
+                stock: stock,
+                ubicacion: inv ? inv.ubicacion : null,
+                sucursalId: selectedSucursal!,
+                rawBook: book
             });
           }
         });
@@ -335,24 +352,31 @@ export default function PointOfSale() {
 
       // ✅ Procesar Dulces 
       if (resDulces.ok) {
-        const dulces = await resDulces.json();
-        dulces.forEach((dulce: any) => {
-          const inv = dulce.inventario.find((i: any) => i.sucursalId === selectedSucursal);
-          if (inv || dulce.inventario.length === 0) {
-            results.push({
-              uniqueId: `dulce-${dulce.id}`,
-              id: dulce.id,
-              type: 'DULCE',
-              titulo: dulce.nombre,
-              subtitulo: dulce.marca || "Sin Marca",
-              precio: Number(dulce.precioVenta),
-              stock: inv ? inv.stock : 0,
-              ubicacion: inv ? inv.ubicacion : null,
-              sucursalId: inv ? inv.sucursalId : selectedSucursal,
-              rawDulce: dulce
+        const responseData = await resDulces.json();
+        // La API devuelve { data: [], meta: {} }, así que obtenemos .data
+        const dulcesList = Array.isArray(responseData) ? responseData : (responseData.data || []);
+        
+        if (Array.isArray(dulcesList)) {
+            dulcesList.forEach((dulce: any) => {
+              const inv = dulce.inventario.find((i: any) => i.sucursalId === selectedSucursal);
+              const stock = inv ? inv.stock : 0;
+              // Filtro: Solo mostrar si hay stock > 0
+              if (stock > 0) {
+                 results.push({
+                    uniqueId: `dulce-${dulce.id}`,
+                    id: dulce.id,
+                    type: 'DULCE',
+                    titulo: dulce.nombre,
+                    subtitulo: dulce.marca || "Sin Marca",
+                    precio: Number(dulce.precioVenta),
+                    stock: stock,
+                    ubicacion: inv ? inv.ubicacion : null,
+                    sucursalId: selectedSucursal!,
+                    rawDulce: dulce
+                 });
+              }
             });
-          }
-        });
+        }
       }
 
       // ✅ Procesar Consignaciones
@@ -360,7 +384,7 @@ export default function PointOfSale() {
         const items = await resConsig.json();
         items.forEach((item: any) => {
             const inv = item.inventario.find((i: any) => i.sucursalId === selectedSucursal);
-            if(inv) { 
+            if(inv && inv.stock > 0) { 
                 results.push({
                     uniqueId: `consig-${item.id}`,
                     id: item.id,
@@ -384,6 +408,11 @@ export default function PointOfSale() {
     } finally {
       setIsLoading(false)
     }
+  }
+
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    executeSearch();
   }
 
   const addToCart = (entry: ProductEntry) => {
@@ -600,7 +629,8 @@ export default function PointOfSale() {
             <select
               value={selectedSucursal || ""}
               onChange={(e) => handleSucursalChange(Number(e.target.value))}
-              className="bg-slate-50 border border-slate-300 text-slate-900 text-sm rounded-lg focus:ring-blue-500 block p-2.5 min-w-[200px]"
+              disabled={!!cashSession}
+              className={`bg-slate-50 border border-slate-300 text-slate-900 text-sm rounded-lg focus:ring-blue-500 block p-2.5 min-w-[200px] ${cashSession ? 'opacity-50 cursor-not-allowed' : ''}`}
             >
               <option value="" disabled>Seleccionar Sucursal</option>
               {sucursales.map(s => <option key={s.id} value={s.id}>{s.nombre}</option>)}

@@ -4,6 +4,7 @@ import * as z from "zod";
 import { LoginSchema } from "@/schemas";
 import { signIn } from "@/auth";
 import { AuthError } from "next-auth";
+// import { isRedirectError } from "next/navigation";
 
 export const login = async (values: z.infer<typeof LoginSchema>) => {
   const validatedFields = LoginSchema.safeParse(values);
@@ -21,6 +22,8 @@ export const login = async (values: z.infer<typeof LoginSchema>) => {
       redirectTo: "/",
     });
   } catch (error) {
+    // if (isRedirectError(error)) throw error;
+    
     if (error instanceof AuthError) {
       switch (error.type) {
         case "CredentialsSignin":
