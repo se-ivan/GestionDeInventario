@@ -189,3 +189,72 @@ export async function sendWhatsAppReceipt(data: ReceiptData) {
     throw error;
   }
 }
+
+interface CashCutData {
+  sucursalName: string;
+  userName: string;
+  fechaApertura: Date;
+  fechaCierre: Date;
+  montoInicial: number;
+  ventas: number;
+  gastos: number;
+  totalCalculado: number;
+  totalReal: number;
+  diferencia: number;
+}
+
+export async function sendCashCutReport(data: CashCutData) {
+  const ownerPhoneNumber = process.env.OWNER_WHATSAPP_NUMBER;
+  const accessToken = process.env.WHATSAPP_ACCESS_TOKEN;
+  const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
+
+  if (!ownerPhoneNumber || !accessToken || !phoneNumberId) {
+     console.error("❌ [WhatsApp] Credenciales faltantes para reporte de corte");
+     return;
+  }
+
+  const apiUrl = `https://graph.facebook.com/v19.0/${phoneNumberId}/messages`;
+  
+  const timeZone = "America/Mexico_City";
+  const fecha = data.fechaCierre.toLocaleDateString("es-MX", { day: "2-digit", month: "long", year: "numeric", timeZone });
+  const hora = data.fechaCierre.toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit", hour12: true, timeZone });
+  
+  const fmt = (n: number) => new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN" }).format(n);
+
+  const payload = {
+    messaging_product: "whatsapp",
+    to: ownerPhoneNumber,
+    type: "template",
+    template: {
+      name: "reporte_corte_de_caja",
+      language: { code: "es_MX" },
+      components: [
+        {
+          type: "body",
+          parameters: [
+            { type: "text", text: fecha + " " + hora }, // {{1}} Fecha/Hora
+            { type: "text", text: data.sucursalName },  // {{2}} Sucursal
+            { type: "text", text: data.userName },      // {{3}} Usuario
+            { type: "text", text: fmt(data.montoInicial) }, // {{4}} Inicial
+            { type: "text", text: fmt(data.ventas) },   // {{5}} Ventas
+            { type: "text", text: fmt(data.gastos) },   // {{6}} Gastos
+            { type: "text", text: fmt(data.totalCalculado) }, // {{7}} Esperado
+            { type: "text", text: fmt(data.totalReal) }, // {{8}} Real
+            { type: "text", text: fmt(data.diferencia) }, // {{9}} Diferencia
+          ]
+        }
+      ]
+    }
+  };
+
+  try {
+      await fetchWithRetry(apiUrl, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      console.log("✅ [WhatsApp] Reporte de corte enviado.");
+  } catch (e) {
+      console.error("❌ [WhatsApp] Error enviando reporte corte:", e);
+  }
+}

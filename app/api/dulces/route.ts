@@ -1,11 +1,13 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 
-// GET: Obtener dulces ACTIVOS
+// GET: Obtener dulces ACTIVOS con Paginación
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const query = searchParams.get('q');
+    const page = parseInt(searchParams.get('page') || '1');
+    const limit = parseInt(searchParams.get('limit') || '20');
 
     const whereClause: any = {
       deletedAt: null, // 👈 FILTRO CLAVE
@@ -19,16 +21,30 @@ export async function GET(request: Request) {
       ];
     }
 
-    const dulces = await prisma.dulce.findMany({
-      where: whereClause,
-      include: {
-        inventario: {
-          include: { sucursal: true },
+    const [dulces, total] = await Promise.all([
+      prisma.dulce.findMany({
+        where: whereClause,
+        include: {
+          inventario: {
+            include: { sucursal: true },
+          },
         },
-      },
-      orderBy: { createdAt: 'desc' },
+        orderBy: { createdAt: 'desc' },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      prisma.dulce.count({ where: whereClause })
+    ]);
+
+    return NextResponse.json({
+      data: dulces,
+      meta: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit)
+      }
     });
-    return NextResponse.json(dulces);
   } catch (error) {
     console.error("Error al obtener dulces:", error);
     return NextResponse.json({ message: 'Error al obtener los dulces' }, { status: 500 });

@@ -42,6 +42,7 @@ model User {
   sucursal   Sucursal?   @relation(fields: [sucursalId], references: [id])
   permisos   String[]    @default([])
   sales      Sale[]
+  apartados  Apartado[]
   cajas      CorteCaja[]
   expenses   Expense[]
 
@@ -59,10 +60,13 @@ model Sucursal {
   // Relaciones con ambos inventarios
   inventarioLibros Inventario[]
   inventarioDulces InventarioDulce[]
+  inventarioConsignacion InventarioConsignacion[]
   
   users            User[]
+  apartados        Apartado[]
   sales            Sale[]
   expenses         Expense[]
+  cajas            CorteCaja[]
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -91,6 +95,7 @@ model Book {
 
   inventario  Inventario[]
   saleDetails SaleDetail[]
+  apartadoItems ApartadoItem[]
   discounts   DiscountCampaign[]
 
   createdAt DateTime @default(now()) @map("created_at")
@@ -120,6 +125,7 @@ model Dulce {
   // Relaciones propias
   inventario  InventarioDulce[]
   saleDetails SaleDetail[]
+  apartadoItems ApartadoItem[]
   discounts   DiscountCampaign[]
   deletedAt     DateTime? @map("deleted_at")
 
@@ -161,7 +167,44 @@ model InventarioDulce {
   @@id([dulceId, sucursalId])
   @@map("inventario_dulces")
 }
+model Consignacion {
+  id               Int      @id @default(autoincrement())
+  nombre           String
+  descripcion      String?
+  proveedor        String?
+  
+  // Datos tipo Libro
+  isbn            String?     @unique
+  autor           String?
+  editorial       String?
+  anioPublicacion Int?        @map("anio_publicacion")
+  genero          String?
+  coleccion       String?
 
+  precioVenta      Decimal  @map("precio_venta") @db.Decimal(10, 2)
+  gananciaLibreria Decimal  @map("ganancia_libreria") @db.Decimal(10, 2)
+  deletedAt        DateTime? @map("deleted_at")
+
+  inventario       InventarioConsignacion[]
+  saleDetails      SaleDetail[]
+  
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  @@map("consignaciones")
+}
+
+model InventarioConsignacion {
+  consignacionId Int      @map("consignacion_id")
+  sucursalId     Int      @map("sucursal_id")
+  stock          Int      @default(0)
+  
+  consignacion   Consignacion @relation(fields: [consignacionId], references: [id], onDelete: Cascade)
+  sucursal       Sucursal     @relation(fields: [sucursalId], references: [id], onDelete: Cascade)
+
+  @@id([consignacionId, sucursalId])
+  @@map("inventario_consignaciones")
+}
 // --- MARKETING ---
 
 model DiscountCampaign {
@@ -234,6 +277,9 @@ model SaleDetail {
   
   dulceId Int?   @map("dulce_id")
   dulce   Dulce? @relation(fields: [dulceId], references: [id])
+  
+  consignacionId Int? @map("consignacion_id")
+  consignacion   Consignacion? @relation(fields: [consignacionId], references: [id])
 
   sale Sale @relation(fields: [saleId], references: [id], onDelete: Cascade)
 
@@ -250,10 +296,12 @@ model CorteCaja {
   fechaCierre   DateTime? @map("fecha_cierre")
   montoInicial  Decimal   @map("monto_inicial") @db.Decimal(10, 2)
   ventasSistema Decimal   @default(0) @map("ventas_sistema") @db.Decimal(10, 2)
+  gastosSistema Decimal   @default(0) @map("gastos_sistema") @db.Decimal(10, 2)
   montoFinal    Decimal?  @map("monto_final") @db.Decimal(10, 2)
   diferencia    Decimal?  @db.Decimal(10, 2)
   observaciones String?
   user          User      @relation(fields: [userId], references: [id])
+  sucursal      Sucursal  @relation(fields: [sucursalId], references: [id])
 
   @@map("cortes_caja")
 }
@@ -299,6 +347,53 @@ model busquedas_pendientes {
   @@index([estado], map: "idx_busquedas_estado")
   @@index([fecha_solicitud], map: "idx_busquedas_fecha_solicitud")
   @@index([prioridad], map: "idx_busquedas_prioridad")
+}
+
+
+// --- APARTADOS ---
+
+enum ApartadoStatus {
+  ACTIVO
+  COMPLETADO
+  CANCELADO
+  VENCIDO
+}
+
+model Apartado {
+  id              Int            @id @default(autoincrement())
+  userId          Int            @map("user_id")
+  sucursalId      Int            @map("sucursal_id")
+  clienteNombre   String         @map("cliente_nombre")
+  clienteTelefono String?        @map("cliente_telefono")
+  fechaCreacion   DateTime       @default(now()) @map("fecha_creacion")
+  fechaVencimiento DateTime      @map("fecha_vencimiento")
+  estado          ApartadoStatus @default(ACTIVO)
+  
+  montoTotal      Decimal        @map("monto_total") @db.Decimal(10, 2)
+  montoPagado     Decimal        @map("monto_pagado") @db.Decimal(10, 2)
+  saldoPendiente  Decimal        @map("saldo_pendiente") @db.Decimal(10, 2)
+  
+  user            User           @relation(fields: [userId], references: [id])
+  sucursal        Sucursal       @relation(fields: [sucursalId], references: [id])
+  items           ApartadoItem[]
+
+  @@map("apartados")
+}
+
+model ApartadoItem {
+  id             Int      @id @default(autoincrement())
+  apartadoId     Int      @map("apartado_id")
+  bookId         Int?     @map("book_id")
+  dulceId        Int?     @map("dulce_id")
+  cantidad       Int
+  precioUnitario Decimal  @map("precio_unitario") @db.Decimal(10, 2)
+  subtotal       Decimal  @db.Decimal(10, 2)
+
+  apartado       Apartado @relation(fields: [apartadoId], references: [id], onDelete: Cascade)
+  book           Book?    @relation(fields: [bookId], references: [id])
+  dulce          Dulce?   @relation(fields: [dulceId], references: [id])
+
+  @@map("apartado_items")
 }
 
 // --- GASTOS ---

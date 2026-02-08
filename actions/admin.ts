@@ -61,41 +61,67 @@ export const getAdminStats = async () => {
     }
 }
 
-export const getChartData = async () => {
-    const days = 7;
-    const salesData = [];
-    const expensesData = [];
+import { startOfDay, endOfDay, subDays, format, eachDayOfInterval } from "date-fns";
+import { es } from "date-fns/locale";
 
-    for (let i = days - 1; i >= 0; i--) {
-        const date = new Date();
-        date.setDate(date.getDate() - i);
-        const startOfDay = new Date(date.setHours(0, 0, 0, 0));
-        const endOfDay = new Date(date.setHours(23, 59, 59, 999));
-        
-        const dateLabel = startOfDay.toLocaleDateString("es-MX", { weekday: 'short', day: 'numeric' });
+export const getChartData = async (range: string = '7d', category?: string) => {
+    const daysMap: { [key: string]: number } = {
+        '7d': 7,
+        '30d': 30,
+        '90d': 90
+    };
+    
+    const days = daysMap[range] || 7;
+    const endDate = new Date();
+    const startDate = subDays(endDate, days - 1);
+    
+    const dateRange = {
+        gte: startOfDay(startDate),
+        lte: endOfDay(endDate)
+    };
 
-        // Sales Query
-        const sales = await prisma.sale.aggregate({
-            _sum: { montoTotal: true },
-            where: { createdAt: { gte: startOfDay, lte: endOfDay } }
-        });
+    // Fetch all records in one go
+    const [sales, expenses] = await Promise.all([
+        prisma.sale.findMany({
+            where: { createdAt: dateRange },
+            select: { createdAt: true, montoTotal: true }
+        }),
+        prisma.expense.findMany({
+            where: { 
+                createdAt: dateRange,
+                ...(category && category !== 'all' ? { categoria: category } : {})
+            },
+            select: { createdAt: true, monto: true }
+        })
+    ]);
 
-        // Expenses Query
-        const expenses = await prisma.expense.aggregate({
-            _sum: { monto: true },
-            where: { createdAt: { gte: startOfDay, lte: endOfDay } }
-        });
+    // Group by day
+    const salesMap = new Map<string, number>();
+    const expensesMap = new Map<string, number>();
 
-        salesData.push({
-            date: dateLabel,
-            value: Number(sales._sum.montoTotal) || 0
-        });
+    // Initialize all days with 0
+    const interval = eachDayOfInterval({ start: startDate, end: endDate });
+    
+    interval.forEach(date => {
+        const key = format(date, "d MMM", { locale: es });
+        salesMap.set(key, 0);
+        expensesMap.set(key, 0);
+    });
 
-        expensesData.push({
-            date: dateLabel,
-            value: Number(expenses._sum.monto) || 0
-        });
-    }
+    sales.forEach(sale => {
+        const key = format(sale.createdAt, "d MMM", { locale: es });
+        const current = salesMap.get(key) || 0;
+        salesMap.set(key, current + Number(sale.montoTotal));
+    });
+
+    expenses.forEach(expense => {
+        const key = format(expense.createdAt, "d MMM", { locale: es });
+        const current = expensesMap.get(key) || 0;
+        expensesMap.set(key, current + Number(expense.monto));
+    });
+
+    const salesData = Array.from(salesMap.entries()).map(([date, value]) => ({ date, value }));
+    const expensesData = Array.from(expensesMap.entries()).map(([date, value]) => ({ date, value }));
 
     return { salesData, expensesData };
 }

@@ -1,10 +1,44 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 
-// GET: Obtiene toda la lista de inventario con datos del libro y la sucursal
-export async function GET() {
+// GET: Obtiene la lista de inventario PAGINADA Y FILTRADA
+export async function GET(request: Request) {
   try {
+    const { searchParams } = new URL(request.url);
+    const page = Number(searchParams.get('page')) || 1;
+    const limit = Number(searchParams.get('limit')) || 20;
+    const query = searchParams.get('q') || "";
+    // const sucursalId = searchParams.get('sucursalId'); // Future improvement
+
+    const skip = (page - 1) * limit;
+
+    // Construir filtro dinámico
+    const whereClause: any = {
+      AND: [
+        {
+          book: {
+            OR: [
+              { titulo: { contains: query, mode: 'insensitive' } },
+              { autor: { contains: query, mode: 'insensitive' } },
+              { isbn: { contains: query, mode: 'insensitive' } }
+            ]
+          }
+        }
+      ]
+    };
+
+    // Agregar validación de existencia (sustituye el filtro posterior que tenías)
+    // En Prisma, relations a veces requieren verificar que no sean null, pero si la DB es consistente no hace falta.
+    // Dejaremos que prisma maneje 'where book' logic.
+
+    // 1. Contar total de registros coincidentes
+    const total = await prisma.inventario.count({
+      where: whereClause
+    });
+
+    // 2. Obtener datos paginados
     const inventario = await prisma.inventario.findMany({
+      where: whereClause,
       include: {
         book: true,
         sucursal: true,
@@ -13,11 +47,20 @@ export async function GET() {
         book: {
           titulo: 'asc'
         }
+      },
+      skip: skip,
+      take: limit
+    });
+
+    return NextResponse.json({
+      data: inventario,
+      meta: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit)
       }
     });
-    // Filtra las entradas donde el libro o la sucursal ya no existen
-    const validInventario = inventario.filter(entry => entry.book && entry.sucursal);
-    return NextResponse.json(validInventario);
   } catch (error) {
     console.error("Error al obtener el inventario:", error);
     return NextResponse.json({ message: 'Error al obtener el inventario' }, { status: 500 });

@@ -10,6 +10,7 @@ import { updateUser } from "@/actions/admin"
 import { register } from "@/actions/register"
 import { Input } from "@/components/ui/input"
 import { Plus } from "lucide-react"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 
 interface User {
 // ... existing User interface
@@ -24,11 +25,13 @@ interface User {
 
 const ALL_PERMISSIONS = [
   { id: "POS", label: "Punto de Venta" },
-  { id: "INVENTORY", label: "Inventario" },
+  { id: "INVENTORY", label: "Inventario (Libros)" },
   { id: "DASHBOARD", label: "Panel de Control" },
-  { id: "EXPENSES", label: "Gastos" },
+  { id: "EXPENSES", label: "Gestión de Gastos" },
   { id: "CANDY", label: "Dulcería" },
-  { id: "PENDING", label: "Pendientes" },
+  { id: "PENDING", label: "Búsquedas Pendientes" },
+  { id: "CASH_CUTS", label: "Cortes de Caja" },
+  { id: "APARTADOS", label: "Sistema de Apartados" },
 ];
 
 export function UserManagement({ initialUsers }: { initialUsers: User[] }) {
@@ -55,9 +58,9 @@ export function UserManagement({ initialUsers }: { initialUsers: User[] }) {
   };
 
   return (
-    <div className="space-y-4">
-      <div className="flex justify-between items-center">
-        <h2 className="text-xl font-bold">Gestión de Usuarios</h2>
+    <Card className="border-0 shadow-md bg-card">
+      <CardHeader className="flex flex-row items-center justify-between pb-2">
+        <CardTitle className="text-xl font-bold">Gestión de Usuarios</CardTitle>
         <Dialog open={isAdding} onOpenChange={setIsAdding}>
             <DialogTrigger asChild>
                 <Button size="sm">
@@ -67,61 +70,63 @@ export function UserManagement({ initialUsers }: { initialUsers: User[] }) {
             </DialogTrigger>
             <CreateUserDialog onAdd={handleAdd} onCancel={() => setIsAdding(false)} />
         </Dialog>
-      </div>
-      <div className="border rounded-md">
-        <table className="w-full text-sm">
-          <thead className="bg-slate-50 border-b">
-            <tr>
-              <th className="p-3 text-left">Nombre</th>
-              <th className="p-3 text-left">Email</th>
-              <th className="p-3 text-left">Rol</th>
-              <th className="p-3 text-left">Permisos</th>
-              <th className="p-3 text-left">Acciones</th>
-            </tr>
-          </thead>
-          <tbody>
-            {users.map((user) => (
-              <tr key={user.id} className="border-b last:border-0 hover:bg-slate-50/50">
-                <td className="p-3">{user.nombre}</td>
-                <td className="p-3 text-gray-500">{user.email}</td>
-                <td className="p-3">
-                  <span className={`px-2 py-1 rounded-full text-xs ${
-                    user.rol === 'ADMIN' ? 'bg-purple-100 text-purple-700' : 
-                    user.rol === 'VENDEDOR' ? 'bg-blue-100 text-blue-700' : 
-                    'bg-green-100 text-green-700'
-                  }`}>
-                    {user.rol}
-                  </span>
-                </td>
-                <td className="p-3">
-                    {user.rol === 'ADMIN' ? (
-                         <span className="text-xs text-gray-400">Acceso Total</span>
-                    ) : (
-                        <div className="flex flex-wrap gap-1">
-                            {user.permissions.length > 0 ? user.permissions.map(p => (
-                                <span key={p} className="bg-gray-100 px-1 rounded text-xs">{p}</span>
-                            )) : <span className="text-gray-400 italic">Sin acceso</span>}
-                        </div>
-                    )}
-                </td>
-                <td className="p-3">
-                  <Dialog open={editingUser?.id === user.id} onOpenChange={(open) => !open && setEditingUser(null)}>
-                    <DialogTrigger asChild>
-                      <Button variant="outline" size="sm" onClick={() => setEditingUser(user)}>
-                        Editar
-                      </Button>
-                    </DialogTrigger>
-                    {editingUser?.id === user.id && (
-                        <EditUserDialog user={editingUser} onSave={handleSave} onCancel={() => setEditingUser(null)} />
-                    )}
-                  </Dialog>
-                </td>
+      </CardHeader>
+      <CardContent>
+        <div className="relative w-full overflow-auto">
+          <table className="w-full text-sm caption-bottom">
+            <thead className="[&_tr]:border-b">
+              <tr className="border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted">
+                <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Nombre</th>
+                <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Email</th>
+                <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Rol</th>
+                <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Permisos</th>
+                <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Acciones</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
+            </thead>
+            <tbody className="[&_tr:last-child]:border-0">
+              {users.map((user) => (
+                <tr key={user.id} className="border-b transition-colors hover:bg-muted/50">
+                  <td className="p-4 align-middle font-medium">{user.nombre}</td>
+                  <td className="p-4 align-middle text-muted-foreground">{user.email}</td>
+                  <td className="p-4 align-middle">
+                    <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold ${
+                      user.rol === 'ADMIN' ? 'bg-purple-100 text-purple-700' : 
+                      user.rol === 'VENDEDOR' ? 'bg-blue-100 text-blue-700' : 
+                      'bg-green-100 text-green-700'
+                    }`}>
+                      {user.rol}
+                    </span>
+                  </td>
+                  <td className="p-4 align-middle">
+                      {user.rol === 'ADMIN' ? (
+                          <span className="text-xs text-muted-foreground italic">Acceso Total</span>
+                      ) : (
+                          <div className="flex flex-wrap gap-1">
+                              {user.permissions.length > 0 ? user.permissions.map(p => (
+                                  <span key={p} className="bg-secondary px-1.5 py-0.5 rounded text-[10px] font-medium text-secondary-foreground">{p}</span>
+                              )) : <span className="text-muted-foreground italic text-xs">Sin acceso</span>}
+                          </div>
+                      )}
+                  </td>
+                  <td className="p-4 align-middle">
+                    <Dialog open={editingUser?.id === user.id} onOpenChange={(open) => !open && setEditingUser(null)}>
+                      <DialogTrigger asChild>
+                        <Button variant="ghost" size="sm" onClick={() => setEditingUser(user)}>
+                          Editar
+                        </Button>
+                      </DialogTrigger>
+                      {editingUser?.id === user.id && (
+                          <EditUserDialog user={editingUser} onSave={handleSave} onCancel={() => setEditingUser(null)} />
+                      )}
+                    </Dialog>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </CardContent>
+    </Card>
   )
 }
 
@@ -143,43 +148,58 @@ function EditUserDialog({ user, onSave, onCancel }: { user: User, onSave: (u: Us
                 <DialogTitle>Editar Usuario: {user.nombre}</DialogTitle>
             </DialogHeader>
             <div className="space-y-4 py-4">
-                <div className="space-y-2">
-                    <Label>Rol</Label>
-                    <div className="flex gap-4">
+                <div className="space-y-3">
+                    <Label>Rol del Usuario</Label>
+                    <div className="flex gap-2">
                         {(['ADMIN', 'VENDEDOR', 'CONTADOR'] as const).map(role => (
-                            <div key={role} className="flex items-center space-x-2">
-                                <Checkbox 
-                                    id={role} 
-                                    checked={formData.rol === role}
-                                    onCheckedChange={() => setFormData({...formData, rol: role})}
-                                />
-                                <label htmlFor={role} className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-                                    {role}
-                                </label>
+                            <div 
+                                key={role}
+                                onClick={() => setFormData({...formData, rol: role})}
+                                className={`
+                                    cursor-pointer px-4 py-2 rounded-lg text-sm font-medium transition-all border
+                                    ${formData.rol === role 
+                                        ? 'bg-slate-900 text-white border-slate-900 shadow-md' 
+                                        : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300 hover:bg-slate-50'}
+                                `}
+                            >
+                                {role}
                             </div>
                         ))}
                     </div>
                 </div>
 
-                <div className="space-y-2">
-                    <Label>Permisos (Solo para No-Admins)</Label>
-                    <div className="grid grid-cols-2 gap-2 mt-2">
-                        {ALL_PERMISSIONS.map(permission => (
-                            <div key={permission.id} className="flex items-center space-x-2">
-                                <Checkbox 
-                                    id={permission.id} 
-                                    checked={formData.permissions.includes(permission.id)}
-                                    // if admin, disable or force checked? Usually admin has all.
-                                    disabled={formData.rol === 'ADMIN'}
-                                    onCheckedChange={() => togglePermission(permission.id)}
-                                />
-                                <Label htmlFor={permission.id} className={formData.rol === 'ADMIN' ? 'text-gray-400' : ''}>
-                                    {permission.label}
-                                </Label>
-                            </div>
-                        ))}
+                <div className="space-y-3">
+                    <div className="flex justify-between items-center">
+                        <Label>Permisos de Acceso</Label>
+                        {formData.rol === 'ADMIN' && <span className="text-xs text-emerald-600 font-medium bg-emerald-50 px-2 py-0.5 rounded-full">Acceso Total Habilitado</span>}
                     </div>
-                    {formData.rol === 'ADMIN' && <p className="text-xs text-muted-foreground">Los administradores tienen acceso total.</p>}
+                    
+                    <div className="grid grid-cols-2 gap-2">
+                        {ALL_PERMISSIONS.map(permission => {
+                            const isSelected = formData.permissions.includes(permission.id) || formData.rol === 'ADMIN';
+                            return (
+                                <div 
+                                    key={permission.id} 
+                                    onClick={() => formData.rol !== 'ADMIN' && togglePermission(permission.id)}
+                                    className={`
+                                        flex items-center space-x-2 p-2 rounded-md transition-all border
+                                        ${isSelected
+                                            ? 'bg-blue-50 border-blue-200 text-blue-900' 
+                                            : 'bg-white border-slate-100 text-slate-500 hover:border-slate-200 hover:bg-slate-50'}
+                                        ${formData.rol === 'ADMIN' ? 'opacity-60 cursor-default' : 'cursor-pointer'}
+                                    `}
+                                >
+                                    <div className={`
+                                        w-4 h-4 rounded-full border flex items-center justify-center
+                                        ${isSelected ? 'bg-blue-600 border-blue-600' : 'border-slate-300'}
+                                    `}>
+                                        {isSelected && <div className="w-1.5 h-1.5 bg-white rounded-full" />}
+                                    </div>
+                                    <span className="text-sm font-medium">{permission.label}</span>
+                                </div>
+                            )
+                        })}
+                    </div>
                 </div>
                 
                  <div className="flex items-center space-x-2 pt-2">

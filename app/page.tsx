@@ -17,14 +17,15 @@ import {
 } from "@/components/ui/dialog"
 import {
   ShoppingCartIcon, BookOpen, Search, Loader2, Minus, Plus,
-  Store, Trash2, Percent, CheckCircle2, Candy, ScanBarcode, ArrowUpRight, AlertCircle
+  Store, Trash2, Percent, CheckCircle2, Candy, ScanBarcode, ArrowUpRight, AlertCircle, FileDown
 } from "lucide-react"
 import { Sucursal } from "@/lib/types"
+import { logout } from "@/actions/logout"
 
 interface ProductEntry {
   uniqueId: string;
   id: number;
-  type: 'BOOK' | 'DULCE';
+  type: 'BOOK' | 'DULCE' | 'CONSIGNACION';
   titulo: string;
   subtitulo: string;
   precio: number;
@@ -33,6 +34,7 @@ interface ProductEntry {
   sucursalId: number;
   rawBook?: any;
   rawDulce?: any;
+  rawConsignacion?: any;
 }
 
 interface CartItem extends ProductEntry {
@@ -74,9 +76,105 @@ export default function PointOfSale() {
     type: 'success' | 'error';
     title: string;
     message: string;
+    downloadUrl?: string;
   }>({ isOpen: false, type: 'success', title: '', message: '' })
 
   const [lastSale, setLastSale] = useState<{ id: number; total: number } | null>(null)
+
+  // --- CASH REGISTER STATE ---
+  const [cashSession, setCashSession] = useState<any>(null)
+  const [isLoadingSession, setIsLoadingSession] = useState(true)
+  const [isOpenSessionModalOpen, setIsOpenSessionModalOpen] = useState(false) // Modal to OPEN
+  const [isCloseSessionModalOpen, setIsCloseSessionModalOpen] = useState(false) // Modal to CLOSE
+  const [openAmount, setOpenAmount] = useState("") 
+  const [closeAmount, setCloseAmount] = useState("") // Real cash
+  const [isClosingSession, setIsClosingSession] = useState(false) // Spinner state
+  
+  // --- LOAD SESSION ---
+  useEffect(() => {
+    checkCashSession()
+  }, [])
+
+  const checkCashSession = async () => {
+    setIsLoadingSession(true)
+    try {
+        const res = await fetch('/api/corte-caja')
+        if (res.ok) {
+            const data = await res.json()
+            if (data.active) {
+                setCashSession(data.data)
+                setIsOpenSessionModalOpen(false)
+            } else {
+                setCashSession(null)
+                // NO FORZAMOS APERTURA AL INICIO PARA NO BLOQUEAR NAVEGACIÓN
+                // setIsOpenSessionModalOpen(true) 
+            }
+        }
+    } catch(e) { console.error(e) }
+    finally { setIsLoadingSession(false) }
+  }
+
+  const handleOpenRegister = async () => {
+     if (!selectedSucursal) {
+         setFeedbackModal({isOpen: true, type: 'error', title: 'Error', message: 'Selecciona una sucursal'})
+         return
+     }
+     
+     try {
+         const res = await fetch('/api/corte-caja', {
+             method: 'POST',
+             headers: {'Content-Type': 'application/json'},
+             body: JSON.stringify({ montoInicial: openAmount, sucursalId: selectedSucursal })
+         })
+         
+         if (res.ok) {
+             const session = await res.json()
+             setCashSession(session)
+             setIsOpenSessionModalOpen(false)
+             checkCashSession() // Refresh full data
+         } else {
+             const err = await res.json()
+             alert(err.message)
+         }
+     } catch(e) { alert("Error al abrir caja") }
+  }
+
+  const handleCloseRegister = async () => {
+      if (!cashSession) return
+      
+      setIsClosingSession(true)
+      try {
+          // 1. Close
+          const res = await fetch('/api/corte-caja', {
+              method: 'PUT',
+              headers: {'Content-Type': 'application/json'},
+              body: JSON.stringify({ id: cashSession.id, montoFinal: closeAmount })
+          })
+
+          if (res.ok) {
+              const closedSession = await res.json()
+              // 2. Download Excel (Optional: Auto-trigger or just let user click)
+              // window.open(`/api/corte-caja/export?id=${closedSession.id}`, '_blank')
+              
+              setFeedbackModal({
+                  isOpen: true, 
+                  type: 'success', 
+                  title: '¡Corte realizado!', 
+                  message: 'El turno se ha cerrado correctamente.',
+                  downloadUrl: `/api/corte-caja/export?id=${closedSession.id}`
+              })
+              setIsCloseSessionModalOpen(false)
+              setCashSession(null)
+              // setIsOpenSessionModalOpen(true) // YA NO FORZAMOS APERTURA INMEDIATA
+              setCartItems([]) // Clear cart
+              setOpenAmount("")
+              setCloseAmount("")
+          } else {
+              alert("Error al cerrar caja")
+          }
+      } catch(e) { console.error(e); alert("Error de red") }
+      finally { setIsClosingSession(false) }
+  }
 
   useEffect(() => {
     const loadSession = () => {
@@ -204,10 +302,11 @@ export default function PointOfSale() {
 
     setIsLoading(true)
     try {
-      // ✅ CORRECCIÓN: Ejecutamos ambas búsquedas simultáneamente
-      const [resBooks, resDulces] = await Promise.all([
+      // ✅ CORRECCIÓN: Ejecutamos las tres búsquedas simultáneamente
+      const [resBooks, resDulces, resConsig] = await Promise.all([
         fetch(`/api/books?q=${encodeURIComponent(searchTerm)}`),
-        fetch(`/api/dulces?q=${encodeURIComponent(searchTerm)}`)
+        fetch(`/api/dulces?q=${encodeURIComponent(searchTerm)}`),
+        fetch(`/api/consignaciones/search?q=${encodeURIComponent(searchTerm)}&sucursalId=${selectedSucursal}`)
       ]);
 
       const results: ProductEntry[] = [];
@@ -234,12 +333,11 @@ export default function PointOfSale() {
         });
       }
 
-      // ✅ Procesar Dulces (Nueva Lógica)
+      // ✅ Procesar Dulces 
       if (resDulces.ok) {
         const dulces = await resDulces.json();
         dulces.forEach((dulce: any) => {
           const inv = dulce.inventario.find((i: any) => i.sucursalId === selectedSucursal);
-          // Mostrar incluso si no hay inventario (stock 0) para que sepan que existe
           if (inv || dulce.inventario.length === 0) {
             results.push({
               uniqueId: `dulce-${dulce.id}`,
@@ -257,6 +355,28 @@ export default function PointOfSale() {
         });
       }
 
+      // ✅ Procesar Consignaciones
+      if (resConsig.ok) {
+        const items = await resConsig.json();
+        items.forEach((item: any) => {
+            const inv = item.inventario.find((i: any) => i.sucursalId === selectedSucursal);
+            if(inv) { 
+                results.push({
+                    uniqueId: `consig-${item.id}`,
+                    id: item.id,
+                    type: 'CONSIGNACION',
+                    titulo: item.nombre,
+                    subtitulo: `Consignación: ${item.proveedor || "Varios"}`,
+                    precio: Number(item.precioVenta),
+                    stock: inv.stock,
+                    ubicacion: null,
+                    sucursalId: inv.sucursalId,
+                    rawConsignacion: item
+                });
+            }
+        });
+      }
+
       setSearchResults(results);
 
     } catch (error) {
@@ -267,6 +387,11 @@ export default function PointOfSale() {
   }
 
   const addToCart = (entry: ProductEntry) => {
+    if (!cashSession) {
+        setIsOpenSessionModalOpen(true)
+        return
+    }
+
     setCartItems((prev) => {
       const existing = prev.find((item) => item.uniqueId === entry.uniqueId);
       if (existing) {
@@ -379,11 +504,24 @@ export default function PointOfSale() {
               {selectedSucursal ? `Sucursal: ${sucursales.find(s => s.id === selectedSucursal)?.nombre}` : "Seleccione sucursal"}
             </p>
             <div className="flex gap-2 items-center">
-               <Button
-                  onClick={handleDownload} 
-               >
-                 Descargar Corte del Día
-               </Button>
+               {!cashSession ? (
+                   <Button 
+                      className="bg-emerald-600 hover:bg-emerald-700 animate-pulse"
+                      onClick={() => setIsOpenSessionModalOpen(true)}
+                   >
+                     Abrir Caja
+                   </Button>
+               ) : (
+                   <Button 
+                      variant="destructive"
+                      onClick={() => {
+                          checkCashSession() // Refresh numbers before opening modal
+                          setIsCloseSessionModalOpen(true)
+                      }}
+                   >
+                     Cerrar Caja
+                   </Button>
+               )}
                
                <Dialog open={isExpenseModalOpen} onOpenChange={setIsExpenseModalOpen}>
                   <DialogTrigger asChild>
@@ -717,6 +855,107 @@ export default function PointOfSale() {
         </DialogContent>
       </Dialog>
 
+      {/* MODAL: ABRIR CAJA (Bloqueante) */}
+      <Dialog open={isOpenSessionModalOpen} onOpenChange={setIsOpenSessionModalOpen}>
+        <DialogContent className="sm:max-w-md" onPointerDownOutside={e => { if(!cashSession) {/* Do nothing if blocking is desired, but user asked for non-blocking */} }}>
+            <DialogHeader>
+                <DialogTitle>Apertura de Caja</DialogTitle>
+                <DialogDescription>
+                    Para comenzar a vender, ingresa el fondo inicial de efectivo.
+                </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+                <div className="space-y-2">
+                    <Label>Sucursal</Label>
+                    <select
+                        value={selectedSucursal || ""}
+                        onChange={(e) => handleSucursalChange(Number(e.target.value))}
+                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                    >
+                        <option value="" disabled>Seleccionar...</option>
+                        {sucursales.map(s => <option key={s.id} value={s.id}>{s.nombre}</option>)}
+                    </select>
+                </div>
+                <div className="space-y-2">
+                    <Label>Monto Inicial (Fondo)</Label>
+                    <Input 
+                        type="number" 
+                        value={openAmount} 
+                        onChange={e => setOpenAmount(e.target.value)} 
+                        placeholder="Ej. 500.00"
+                        autoFocus 
+                    />
+                </div>
+            </div>
+            <DialogFooter className="flex justify-between gap-2 sm:gap-0">
+                <div className="flex-1 flex justify-start">
+                   <Button variant="ghost" onClick={() => logout()}>
+                       Cerrar Sesión
+                   </Button>
+                </div>
+                <Button onClick={handleOpenRegister} disabled={!selectedSucursal || !openAmount}>
+                    Iniciar Turno
+                </Button>
+            </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* MODAL: CERRAR CAJA */}
+      <Dialog open={isCloseSessionModalOpen} onOpenChange={setIsCloseSessionModalOpen}>
+        <DialogContent className="sm:max-w-lg">
+            <DialogHeader>
+                <DialogTitle>Cierre de Caja - {cashSession?.sucursal?.nombre}</DialogTitle>
+                <DialogDescription>
+                    Verifica los montos antes de cerrar el turno.
+                </DialogDescription>
+            </DialogHeader>
+            {cashSession && (
+                <div className="space-y-4 py-4">
+                     <div className="grid grid-cols-2 gap-4 bg-slate-50 p-4 rounded-lg">
+                         <div>
+                             <p className="text-xs text-slate-500">Fondo Inicial</p>
+                             <p className="font-semibold">${Number(cashSession.montoInicial).toFixed(2)}</p>
+                         </div>
+                         <div>
+                             <p className="text-xs text-slate-500">Ventas Sistema</p>
+                             <p className="font-semibold text-green-600">+${Number(cashSession.ventasSistema).toFixed(2)}</p>
+                         </div>
+                         <div>
+                             <p className="text-xs text-slate-500">Gastos Registrados</p>
+                             <p className="font-semibold text-red-600">-${Number(cashSession.gastosSistema).toFixed(2)}</p>
+                         </div>
+                         <div className="border-t border-slate-200 pt-2 mt-2 col-span-2">
+                             <p className="text-sm font-bold text-slate-700">Total Esperado en Caja</p>
+                             <p className="text-2xl font-black text-slate-900">${(Number(cashSession.totalEsperado)).toFixed(2)}</p>
+                         </div>
+                     </div>
+
+                     <div className="space-y-2">
+                         <Label className="text-base">Efectivo Real (Conteo Físico)</Label>
+                         <Input 
+                            type="number" 
+                            className="text-lg font-bold h-12"
+                            placeholder="0.00"
+                            value={closeAmount}
+                            onChange={e => setCloseAmount(e.target.value)}
+                         />
+                         {closeAmount && (
+                             <div className={`text-sm font-medium ${Number(closeAmount) - Number(cashSession.totalEsperado) >= -1 && Number(closeAmount) - Number(cashSession.totalEsperado) <= 1 ? 'text-green-600' : 'text-red-600'}`}>
+                                 Diferencia: ${(Number(closeAmount) - Number(cashSession.totalEsperado)).toFixed(2)}
+                             </div>
+                         )}
+                     </div>
+                </div>
+            )}
+            <DialogFooter>
+                <Button variant="outline" onClick={() => setIsCloseSessionModalOpen(false)} disabled={isClosingSession}>Cancelar</Button>
+                <Button variant="destructive" onClick={handleCloseRegister} disabled={!closeAmount || isClosingSession}>
+                    {isClosingSession ? <><Loader2 className="mr-2 animate-spin" /> Cerrando...</> : "Confirmar Cierre"}
+                </Button>
+            </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* MODAL DE FEEDBACK (ÉXITO/ERROR) */}
       <Dialog open={feedbackModal.isOpen} onOpenChange={(open) => setFeedbackModal(prev => ({ ...prev, isOpen: open }))}>
         <DialogContent className="sm:max-w-md border-0 shadow-lg">
@@ -733,13 +972,23 @@ export default function PointOfSale() {
               {feedbackModal.message}
             </DialogDescription>
           </DialogHeader>
-          <DialogFooter className="sm:justify-center pt-2">
+          <DialogFooter className="sm:justify-center pt-2 gap-2 flex flex-col sm:flex-row">
+            {feedbackModal.downloadUrl && (
+                <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full sm:w-auto gap-2"
+                    onClick={() => window.open(feedbackModal.downloadUrl, '_blank')}
+                >
+                    <FileDown className="h-4 w-4" /> Descargar Excel
+                </Button>
+            )}
             <Button 
               type="button" 
               className={`w-full sm:w-auto min-w-[140px] font-bold ${feedbackModal.type === 'success' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-red-600 hover:bg-red-700'}`}
               onClick={() => setFeedbackModal(prev => ({ ...prev, isOpen: false }))}
             >
-              Entendido
+              {feedbackModal.downloadUrl ? 'Cerrar' : 'Entendido'}
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -53,19 +53,29 @@ export default function VentasDashboard() {
   const [expenses, setExpenses] = useState<any[]>([])
   const [totalExpenses, setTotalExpenses] = useState(0)
 
+  // Pagination
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
+
   // Carga de datos
-  const fetchSales = async () => {
+  const fetchSales = async (pageNum = 1) => {
     setLoading(true)
     try {
       const today = new Date().toISOString().split('T')[0]
       const [res, expensesRes] = await Promise.all([
-         fetch('/api/sales?limit=100'),
+         fetch(`/api/sales?page=${pageNum}&limit=20`),
          fetch(`/api/expenses?date=${today}`)
       ])
 
       const data = await res.json()
       setSales(data.sales || [])
       setStats(data.stats || { totalRevenue: 0, totalTransactions: 0, avgTicket: 0 })
+      
+      if(data.meta) {
+          setTotalPages(data.meta.totalPages)
+          setTotalItems(data.meta.total)
+      }
 
       if (expensesRes.ok) {
         const expData = await expensesRes.json()
@@ -81,8 +91,8 @@ export default function VentasDashboard() {
   }
 
   useEffect(() => {
-    fetchSales()
-  }, [])
+    fetchSales(page)
+  }, [page])
 
   // Manejadores
   const handleViewDetails = async (saleId: number) => {
@@ -105,7 +115,7 @@ export default function VentasDashboard() {
         const res = await fetch(`/api/sales/${selectedSale.id}`, { method: 'DELETE' })
         if (res.ok) {
             setIsDetailOpen(false)
-            fetchSales()
+            fetchSales(page)
         } else {
             alert("Error al cancelar")
         }
@@ -135,7 +145,7 @@ export default function VentasDashboard() {
             <h1 className="text-3xl font-bold text-slate-800 tracking-tight">Reporte de Ventas</h1>
             <p className="text-slate-500">Historial de transacciones y métricas clave.</p>
         </div>
-        <Button onClick={fetchSales} variant="outline" className="gap-2 bg-white hover:bg-slate-50 border-slate-200 shadow-sm text-slate-700">
+        <Button onClick={() => fetchSales()} variant="outline" className="gap-2 bg-white hover:bg-slate-50 border-slate-200 shadow-sm text-slate-700">
             <TrendingUp className="w-4 h-4" /> Actualizar
         </Button>
       </div>
@@ -223,6 +233,29 @@ export default function VentasDashboard() {
             </TableBody>
             </Table>
         </div>
+        <div className="flex items-center justify-between space-x-2 p-4 border-t border-slate-100">
+            <div className="text-sm text-slate-500">
+                Total: {totalItems} ventas | Página {page} de {totalPages}
+            </div>
+            <div className="space-x-2">
+                <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setPage(p => Math.max(1, p - 1))}
+                    disabled={page === 1 || loading}
+                >
+                    Anterior
+                </Button>
+                <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                    disabled={page === totalPages || loading}
+                >
+                    Siguiente
+                </Button>
+            </div>
+        </div>
       </Card>
 
       {/* TABLA DE GASTOS */}
@@ -277,7 +310,7 @@ export default function VentasDashboard() {
       {/* MODAL DETALLE - Mejorada para contenido largo */}
       <Dialog open={isDetailOpen} onOpenChange={setIsDetailOpen}>
         <DialogContent className="sm:max-w-3xl max-h-[90vh] overflow-hidden flex flex-col p-0 gap-0 rounded-2xl border-0 shadow-2xl">
-            
+            <DialogTitle className="sr-only">Detalle de Venta</DialogTitle>
             {/* Header Modal */}
             <div className="p-6 bg-slate-50 border-b border-slate-100 flex justify-between items-start">
                 <div>

@@ -26,10 +26,10 @@ export default async function AdminPage() {
             
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
                 <div className="col-span-4">
-                     <AdminChart title="Ventas Últimos 7 Días" data={salesData} color="#16a34a" />
+                     <AdminChart title="Ventas Generales" data={salesData} color="#16a34a" type="sales" />
                 </div>
                 <div className="col-span-3">
-                     <AdminChart title="Gastos Últimos 7 Días" data={expensesData} color="#ef4444" />
+                     <AdminChart title="Control de Gastos" data={expensesData} color="#ef4444" type="expenses" />
                 </div>
             </div>
 

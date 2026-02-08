@@ -6,21 +6,33 @@ export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams
     const query = searchParams.get('q')
+    const sucursalId = searchParams.get('sucursalId')
 
     if (!query) {
       return NextResponse.json({ message: 'Falta el término de búsqueda' }, { status: 400 })
     }
 
+    const where: any = {
+      deletedAt: null, // Solo activos
+      OR: [
+        { isbn: { contains: query } },
+        { titulo: { contains: query, mode: 'insensitive' } },
+        { autor: { contains: query, mode: 'insensitive' } },  
+      ]
+    }
+
+    // Filtrar por sucursal si se proporciona
+    if (sucursalId) {
+      where.inventario = {
+        some: {
+          sucursalId: parseInt(sucursalId)
+        }
+      }
+    }
+
     // Lógica de búsqueda
     const books = await prisma.book.findMany({
-      where: {
-        deletedAt: null, // Solo activos
-        OR: [
-          { isbn: { contains: query } },
-          { titulo: { contains: query, mode: 'insensitive' } },
-          { autor: { contains: query, mode: 'insensitive' } },  
-        ]
-      },
+      where,
       include: {
         inventario: true
       },

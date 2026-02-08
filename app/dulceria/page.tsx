@@ -122,17 +122,25 @@ export default function DulceriaPage() {
     message: string
   }>({ type: 'success', title: '', message: '' })
 
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
+
   useEffect(() => {
     fetchSucursales()
-    fetchDulces() 
   }, [])
 
   useEffect(() => {
     const timer = setTimeout(() => {
-        fetchDulces()
+        setPage(1)
+        fetchDulces(1, searchTerm)
     }, 400) 
     return () => clearTimeout(timer)
   }, [searchTerm])
+
+  useEffect(() => {
+    fetchDulces(page, searchTerm)
+  }, [page])
 
   const fetchSucursales = async () => {
     try {
@@ -145,12 +153,16 @@ export default function DulceriaPage() {
     } catch (e) { console.error(e) }
   }
 
-  const fetchDulces = async () => {
+  const fetchDulces = async (pageNum = 1, query = "") => {
     setIsLoading(true)
     try {
-      const url = searchTerm ? `/api/dulces?q=${encodeURIComponent(searchTerm)}` : '/api/dulces'
-      const res = await fetch(url)
-      if (res.ok) setDulces(await res.json())
+      const res = await fetch(`/api/dulces?page=${pageNum}&limit=20&q=${encodeURIComponent(query)}`)
+      if (res.ok) {
+          const { data, meta } = await res.json()
+          setDulces(data)
+          setTotalPages(meta.totalPages)
+          setTotalItems(meta.total)
+      }
     } catch (e) { console.error(e) }
     finally { setIsLoading(false) }
   }
@@ -260,7 +272,7 @@ export default function DulceriaPage() {
         if (!isEditing) setFormData(INITIAL_FORM) 
         setIsEditing(false)
         setView('list') 
-        fetchDulces() 
+        fetchDulces(page, searchTerm) 
     }
   }
 
@@ -377,19 +389,40 @@ export default function DulceriaPage() {
                 <p className="text-slate-400 text-sm">Intenta otra búsqueda o agrega un nuevo producto.</p>
              </div>
           ) : (
-             <DulceGrid 
+             <><DulceGrid
                 dulces={dulces.map(d => {
-                    const inv = d.inventario.find((i: any) => i.sucursalId === currentSucursalId);
-                    return {
-                        ...d,
-                        stockTotal: inv ? inv.stock : 0, 
-                        sucursalId: currentSucursalId
-                    };
-                })} 
+                  const inv = d.inventario.find((i: any) => i.sucursalId === currentSucursalId)
+                  return {
+                    ...d,
+                    stockTotal: inv ? inv.stock : 0,
+                    sucursalId: currentSucursalId
+                  }
+                })}
                 onEdit={handleEdit}
                 onDelete={handleDelete}
-                onUpdateStock={handleUpdateStock}
-             />
+                onUpdateStock={handleUpdateStock} /><div className="flex items-center justify-between space-x-2 py-4">
+                  <div className="text-sm text-slate-500">
+                    Total: {totalItems} items | Página {page} de {totalPages}
+                  </div>
+                  <div className="space-x-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setPage(p => Math.max(1, p - 1))}
+                      disabled={page === 1 || isLoading}
+                    >
+                      Anterior
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                      disabled={page === totalPages || isLoading}
+                    >
+                      Siguiente
+                    </Button>
+                  </div>
+                </div></>
           )}
         </div>
       )}

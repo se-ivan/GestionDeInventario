@@ -2,29 +2,36 @@ import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { sendWhatsAppReceipt } from '@/lib/whatsapp';
 import { PaymentMethod } from '@prisma/client';
+import { auth } from '@/auth';
 
 // --- GET: Listado de Ventas y Estadísticas ---
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
-    const limit = Number(searchParams.get('limit')) || 50;
+    const limit = Number(searchParams.get('limit')) || 20;
+    const page = Number(searchParams.get('page')) || 1;
     
-    // Obtenemos ventas ordenadas por fecha reciente
-    const sales = await prisma.sale.findMany({
-      take: limit,
-      orderBy: { fecha: 'desc' },
-      include: {
-        user: { select: { nombre: true } },
-        sucursal: { select: { nombre: true } },
-        details: {
-            select: { cantidad_vendida: true }
-        }
-      }
-    });
+    // Obtenemos ventas ordenadas por fecha reciente con paginación
+    const [sales, total] = await Promise.all([
+        prisma.sale.findMany({
+            take: limit,
+            skip: (page - 1) * limit,
+            orderBy: { fecha: 'desc' },
+            include: {
+                user: { select: { nombre: true } },
+                sucursal: { select: { nombre: true } },
+                details: {
+                    select: { cantidad_vendida: true }
+                }
+            }
+        }),
+        prisma.sale.count()
+    ]);
 
-    // Calcular estadísticas básicas para el Dashboard
+    // Calcular estadísticas (De la página actual - o idealmente cambiar a agregación global)
+    // Nota: Para mejorar rendimiento, calculamos stats solo de lo visible O usar aggregate en query separada
     const totalRevenue = sales.reduce((acc, sale) => acc + Number(sale.montoTotal), 0);
-    const totalTransactions = sales.length;
+    const totalTransactions = sales.length; // Transacciones en esta página
     const avgTicket = totalTransactions > 0 ? totalRevenue / totalTransactions : 0;
 
     // Formatear datos para la tabla
@@ -45,7 +52,13 @@ export async function GET(request: Request) {
         totalTransactions,
         avgTicket
       },
-      sales: formattedSales
+      sales: formattedSales,
+      meta: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit)
+      }
     });
 
   } catch (error) {
@@ -57,7 +70,7 @@ export async function GET(request: Request) {
 // --- POST: Crear Venta Mixta (Libros + Dulces) ---
 interface CartItemPayload {
   id: number;      
-  type: 'BOOK' | 'DULCE'; 
+  type: 'BOOK' | 'DULCE' | 'CONSIGNACION'; 
   quantity: number;
 }
 
@@ -71,6 +84,7 @@ interface SaleRequestBody {
 
 export async function POST(request: Request) {
   try {
+    const session = await auth();
     const body: SaleRequestBody = await request.json();
     const { items, sucursalId, paymentMethod, userId, discountPercent = 0 } = body;
 
@@ -135,6 +149,24 @@ export async function POST(request: Request) {
                 where: { dulceId_sucursalId: { dulceId: itemIdNum, sucursalId: sucursalIdNum } },
                 data: { stock: { decrement: cantidad } }
             });
+        } else if (item.type === 'CONSIGNACION') {
+            const invRecord = await tx.inventarioConsignacion.findUnique({
+                where: { consignacionId_sucursalId: { consignacionId: itemIdNum, sucursalId: sucursalIdNum } },
+                include: { consignacion: true }
+            });
+
+            if (!invRecord) throw new Error(`El producto de consignación (ID: ${itemIdNum}) no existe en esta sucursal.`);
+            if (invRecord.stock < cantidad) throw new Error(`Stock insuficiente: ${invRecord.consignacion.nombre}`);
+
+            // USAR GANANCIA COMO PRECIO DE REGISTRO
+            precioVentaOriginal = Number(invRecord.consignacion.gananciaLibreria);
+            tasaIva = 0; 
+            tituloProducto = invRecord.consignacion.nombre;
+
+            await tx.inventarioConsignacion.update({
+                where: { consignacionId_sucursalId: { consignacionId: itemIdNum, sucursalId: sucursalIdNum } },
+                data: { stock: { decrement: cantidad } }
+            });
         }
 
         // Cálculos Financieros
@@ -156,6 +188,7 @@ export async function POST(request: Request) {
         detailData.push({
           bookId: item.type === 'BOOK' ? itemIdNum : null,   
           dulceId: item.type === 'DULCE' ? itemIdNum : null, 
+          consignacionId: item.type === 'CONSIGNACION' ? itemIdNum : null,
           cantidad_vendida: cantidad, 
           precioUnitario: precioBaseUnitario,
           impuestoAplicado: impuestoLinea,
@@ -168,7 +201,7 @@ export async function POST(request: Request) {
       const newSale = await tx.sale.create({
         data: {
           sucursalId: Number(sucursalId),
-          userId: userId || 1, 
+          userId: session?.user?.id ? parseInt(session.user.id) : (userId || 1), 
           fecha: new Date(),
           metodoPago: paymentMethod, 
           subtotal: saleSubtotal,
@@ -181,7 +214,7 @@ export async function POST(request: Request) {
         },
         include: {
           details: { 
-            include: { book: true, dulce: true } 
+            include: { book: true, dulce: true, consignacion: true } 
           },
           sucursal: true
         }
@@ -192,7 +225,7 @@ export async function POST(request: Request) {
 
     // 3. Notificación WhatsApp
     try {
-        const userIdToFind = userId || 1;
+        const userIdToFind = session?.user?.id ? parseInt(session.user.id) : (userId || 1);
         const vendedor = await prisma.user.findUnique({ where: { id: userIdToFind }, select: { nombre: true } });
         
         const itemsReceipt = saleResult.details.map((d) => {

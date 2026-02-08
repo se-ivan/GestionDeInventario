@@ -30,7 +30,8 @@ export const { auth, signIn, signOut, handlers } = NextAuth({
               ...user,
               id: user.id.toString(),
               name: user.nombre,
-              permissions: user.permisos, // Map database 'permisos' to 'permissions'
+              permissions: user.permisos,
+              role: user.rol, // Convert enum to string for JWT serialization
             };
           }
         }
@@ -45,18 +46,23 @@ export const { auth, signIn, signOut, handlers } = NextAuth({
         session.user.id = token.sub;
         session.user.permissions = token.permissions as string[]; // Cast to appropriate type
         session.user.role = token.role as string;
+        session.user.sucursalId = token.sucursalId as number | null;
       }
       return session;
     },
-    async jwt({ token }) {
-      // Fetch fresh user data if needed or just pass it through
-      if (token.sub) {
-         const user = await prisma.user.findUnique({ where: { id: parseInt(token.sub) } });
-         if (!user || !user.activo) {
+    async jwt({ token, user, trigger, session }) {
+      if (user) {
+        token.permissions = (user as any).permissions;
+        token.role = (user as any).role;
+        token.sucursalId = (user as any).sucursalId;
+      } else if (token.sub) {
+         const dbUser = await prisma.user.findUnique({ where: { id: parseInt(token.sub) } });
+         if (!dbUser || !dbUser.activo) {
              return null; // This will invalidate the session
          }
-         token.permissions = user.permisos;
-         token.role = user.rol;
+         token.permissions = dbUser.permisos;
+         token.role = String(dbUser.rol); // Ensure enum is converted to string
+         token.sucursalId = dbUser.sucursalId;
       }
       return token;
     }

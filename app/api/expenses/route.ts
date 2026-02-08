@@ -1,8 +1,10 @@
 import { NextResponse } from 'next/server';
 import  prisma  from '@/lib/prisma';
+import { auth } from '@/auth';
 
 export async function POST(request: Request) {
   try {
+    const session = await auth();
     const body = await request.json();
     const { monto, concepto, categoria, userId, sucursalId } = body;
 
@@ -21,7 +23,7 @@ export async function POST(request: Request) {
     }
 
     // Usar valores por defecto si no vienen (asumiendo usuario 1 por ahora si no hay auth context)
-    const finalUserId = userId ? parseInt(userId) : 1; 
+    const finalUserId = session?.user?.id ? parseInt(session.user.id) : (userId ? parseInt(userId) : 1);
     const finalSucursalId = sucursalId ? parseInt(sucursalId) : 1;
 
     // Crear Gasto y Notificación en una transacción
