@@ -52,8 +52,14 @@ export function SidebarNav() {
     Gestión: true
   });
 
+  // Force re-render when session changes
+  if (status === "loading") return <div className="w-64 bg-white border-r border-slate-200 hidden md:block" />;
+
   const isAdmin = user?.role === 'ADMIN';
   const permissions = user?.permissions || [];
+  const userName = user?.name || "Usuario";
+  const userRole = user?.role || "Rol";
+  const userInitial = userName[0] || "U";
 
   const toggleGroup = (group: string) => {
     setExpandedGroups(prev => ({ ...prev, [group]: !prev[group] }));
@@ -133,7 +139,7 @@ export function SidebarNav() {
         </Button>
       </div>
 
-      <div className="flex-1 overflow-y-auto py-6 px-3 space-y-6">
+      <div className="flex-1 overflow-y-auto py-6 px-3 space-y-6" key={user?.email || 'guest'}>
         {menuGroups.map((group) => {
           // Check if user has permission for AT LEAST one item in group
           const hasGroupPermission = group.items.some(item =>
@@ -183,11 +189,11 @@ export function SidebarNav() {
       <div className="p-4 border-t border-slate-100 bg-slate-50">
         <div className="flex items-center gap-3 mb-3 px-2">
           <div className="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 font-bold">
-            {user?.name?.[0] || "U"}
-          </div>
-          <div className="overflow-hidden">
-            <p className="text-sm font-medium text-slate-900 truncate">{user?.name}</p>
-            <p className="text-xs text-slate-500 truncate">{user?.role}</p>
+                {userInitial}
+            </div>
+            <div className="overflow-hidden">
+                <p className="text-sm font-medium text-slate-900 truncate">{userName}</p>
+                <p className="text-xs text-slate-500 truncate">{userRole}</p>
           </div>
         </div>
         <Button
