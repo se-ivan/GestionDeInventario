@@ -199,7 +199,7 @@ export async function GET(request: Request) {
         })
     ]);
 
-    const destinatarios = ['5214431866632'];
+    const destinatarios = ['5214431866632', '5214434911529']; // Números de WhatsApp a notificar
 
     if (ventas.length === 0 && gastos.length === 0) {
       // Ajuste aquí para pasar la fecha correcta
