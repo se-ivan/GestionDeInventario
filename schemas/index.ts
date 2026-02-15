@@ -35,3 +35,16 @@ export const PasswordChangeSchema = z.object({
   message: "Las contraseñas no coinciden",
   path: ["confirmPassword"],
 });
+
+export const ClientSchema = z.object({
+  nombre: z.string().min(1, { message: "El nombre es requerido" }),
+  email: z.string().email("Email inválido").optional().or(z.literal('')),
+  telefono: z.string().optional(),
+  direccion: z.string().optional(),
+  matricula: z.string().optional(),
+  semestre: z.string().optional(),
+  grupo: z.string().optional(),
+  turno: z.string().optional(),
+  tipo: z.string().default("GENERAL"),
+});
+

@@ -3,6 +3,7 @@
 import prisma from "@/lib/prisma";
 import { UserRole } from "@prisma/client";
 import { revalidatePath } from "next/cache";
+import bcrypt from "bcryptjs";
 
 export const getUsers = async () => {
     // Only allow admin? (Should invoke auth() here but for brevity assuming page protection)
@@ -38,6 +39,17 @@ export const updateUser = async (userId: number, data: { rol?: UserRole, permiss
         data: updateData
     });
     revalidatePath("/admin");
+    return { success: true };
+};
+
+export const changeUserPassword = async (userId: number, newPassword: string) => {
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    
+    await prisma.user.update({
+        where: { id: userId },
+        data: { password: hashedPassword }
+    });
+    
     return { success: true };
 };
 

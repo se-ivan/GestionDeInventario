@@ -205,6 +205,49 @@ model InventarioConsignacion {
   @@id([consignacionId, sucursalId])
   @@map("inventario_consignaciones")
 }
+model Cliente {
+  id        Int      @id @default(autoincrement())
+  nombre    String
+  email     String?  @unique
+  telefono  String?
+  direccion String?
+  
+  // Identificación
+  codigoBarras String? @unique @map("codigo_barras")
+  sku          String? @unique
+  tipo         String  @default("GENERAL") // ESTUDIANTE, GENERAL, ETC.
+
+  // Campos específicos de estudiante (opcionales)
+  matricula     String? 
+  semestre      String?
+  grupo         String?
+  turno         String? 
+
+  visitas      Visita[]
+  // No linking to Sale strictly yet to avoid migration issues with existing data
+  // sales        Sale[] 
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([codigoBarras])
+  @@index([nombre])
+  @@map("clientes")
+}
+
+model Visita {
+  id        Int      @id @default(autoincrement())
+  clienteId Int      @map("cliente_id")
+  fecha     DateTime @default(now())
+  motivo    String?
+  
+  cliente   Cliente  @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+
+  @@index([clienteId])
+  @@index([fecha])
+  @@map("visitas")
+}
+
 // --- MARKETING ---
 
 model DiscountCampaign {

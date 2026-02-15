@@ -3,7 +3,7 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import {
-  BookOpen, ShoppingCart, Package, BarChart3, Book, Candy,
+  BookOpen, ShoppingCart, Package, BarChart3, Book, Candy, Users,
   DollarSign, LogOut, Shield, User, Bookmark, Tag, Menu, X, ChevronDown, ChevronRight
 } from "lucide-react"
 import { logout } from "@/actions/logout"
@@ -33,6 +33,7 @@ const menuGroups = [
   {
     title: "Gestión",
     items: [
+      { href: "/clientes", title: "Clientes", icon: Users, permission: "CLIENTS" },
       { href: "/gastos", title: "Gastos", icon: DollarSign, permission: "EXPENSES" },
       { href: "/admin/cortes", title: "Cortes de Caja", icon: BarChart3, permission: "CASH_CUTS" },
       { href: "/admin", title: "Admin", icon: Shield, permission: "ADMIN" },

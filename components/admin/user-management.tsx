@@ -6,11 +6,12 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog"
 import { UserRole } from "@prisma/client"
-import { updateUser } from "@/actions/admin"
+import { updateUser, changeUserPassword } from "@/actions/admin"
 import { register } from "@/actions/register"
 import { Input } from "@/components/ui/input"
-import { Plus } from "lucide-react"
+import { Plus, Eye, EyeOff } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Separator } from "@/components/ui/separator"
 
 interface User {
 // ... existing User interface
@@ -132,6 +133,27 @@ export function UserManagement({ initialUsers }: { initialUsers: User[] }) {
 
 function EditUserDialog({ user, onSave, onCancel }: { user: User, onSave: (u: User) => void, onCancel: () => void }) {
     const [formData, setFormData] = useState(user);
+    const [newPassword, setNewPassword] = useState("");
+    const [passwordLoading, setPasswordLoading] = useState(false);
+    const [passwordMessage, setPasswordMessage] = useState({ type: "", text: "" });
+    const [showPassword, setShowPassword] = useState(false);
+
+    const handlePasswordChange = async () => {
+        if (!newPassword) return;
+        setPasswordLoading(true);
+        setPasswordMessage({ type: "", text: "" });
+        try {
+            const res = await changeUserPassword(user.id, newPassword);
+            if (res.success) {
+                setPasswordMessage({ type: "success", text: "Contraseña actualizada con éxito" });
+                setNewPassword("");
+            }
+        } catch (error) {
+            setPasswordMessage({ type: "error", text: "Error al actualizar la contraseña" });
+        } finally {
+            setPasswordLoading(false);
+        }
+    };
 
     const togglePermission = (id: string) => {
         setFormData(prev => ({
@@ -211,6 +233,47 @@ function EditUserDialog({ user, onSave, onCancel }: { user: User, onSave: (u: Us
                     <Label htmlFor="activo">Usuario Activo</Label>
                 </div>
 
+                <Separator className="my-4" />
+
+                <div className="space-y-3">
+                    <Label>Cambiar Contraseña</Label>
+                    <div className="flex space-x-2">
+                        <div className="relative flex-1">
+                            <Input 
+                                type={showPassword ? "text" : "password"} 
+                                placeholder="Nueva contraseña" 
+                                value={newPassword}
+                                onChange={(e) => setNewPassword(e.target.value)}
+                            />
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                                onClick={() => setShowPassword((prev) => !prev)}
+                            >
+                                {showPassword ? (
+                                    <EyeOff className="h-4 w-4 text-muted-foreground" />
+                                ) : (
+                                    <Eye className="h-4 w-4 text-muted-foreground" />
+                                )}
+                            </Button>
+                        </div>
+                        <Button 
+                            variant="secondary"
+                            onClick={handlePasswordChange}
+                            disabled={!newPassword || passwordLoading}
+                        >
+                            {passwordLoading ? "Cambiando..." : "Cambiar"}
+                        </Button>
+                    </div>
+                    {passwordMessage.text && (
+                        <p className={`text-xs ${passwordMessage.type === 'success' ? 'text-emerald-600' : 'text-destructive'}`}>
+                            {passwordMessage.text}
+                        </p>
+                    )}
+                </div>
+
             </div>
             <DialogFooter>
                 <Button variant="outline" onClick={onCancel}>Cancelar</Button>
@@ -225,6 +288,7 @@ function CreateUserDialog({ onAdd, onCancel }: { onAdd: (u: any) => void, onCanc
     const [nombre, setNombre] = useState("");
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
+    const [showPassword, setShowPassword] = useState(false);
 
     const handleSubmit = async () => {
         if (!nombre || !email || !password) {
@@ -256,7 +320,27 @@ function CreateUserDialog({ onAdd, onCancel }: { onAdd: (u: any) => void, onCanc
                 </div>
                 <div className="space-y-2">
                     <Label>Contraseña</Label>
-                    <Input value={password} onChange={(e) => setPassword(e.target.value)} type="password" placeholder="******" />
+                    <div className="relative">
+                        <Input 
+                            value={password} 
+                            onChange={(e) => setPassword(e.target.value)} 
+                            type={showPassword ? "text" : "password"} 
+                            placeholder="******" 
+                        />
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                            onClick={() => setShowPassword((prev) => !prev)}
+                        >
+                            {showPassword ? (
+                                <EyeOff className="h-4 w-4 text-muted-foreground" />
+                            ) : (
+                                <Eye className="h-4 w-4 text-muted-foreground" />
+                            )}
+                        </Button>
+                    </div>
                 </div>
                 {error && <p className="text-sm text-destructive">{error}</p>}
             </div>
