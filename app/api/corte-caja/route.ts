@@ -3,6 +3,82 @@ import prisma from '@/lib/prisma';
 import { auth } from '@/auth';
 import { sendCashCutReport } from '@/lib/whatsapp';
 
+const CASH_WITHDRAWAL_CATEGORY = 'RETIRO_EFECTIVO';
+const CARD_METHODS = new Set(['TARJETA', 'TARJETA_DEBITO', 'TARJETA_CREDITO']);
+const OTHER_NON_CASH_METHODS = new Set(['TRANSFERENCIA', 'VALES']);
+
+const calculateCashCutMetrics = async (
+  userId: number,
+  sucursalId: number,
+  fechaApertura: Date,
+  fechaCierre?: Date | null
+) => {
+  const endDate = fechaCierre ?? new Date();
+
+  const [salesByMethod, operationalExpensesAgg, withdrawalsAgg] = await Promise.all([
+    prisma.sale.groupBy({
+      by: ['metodoPago'],
+      _sum: { montoTotal: true },
+      where: {
+        userId,
+        sucursalId,
+        fecha: { gte: fechaApertura, lte: endDate },
+        estado: 'COMPLETADA',
+      },
+    }),
+    prisma.expense.aggregate({
+      _sum: { monto: true },
+      where: {
+        userId,
+        sucursalId,
+        fecha: { gte: fechaApertura, lte: endDate },
+        categoria: { not: CASH_WITHDRAWAL_CATEGORY },
+      },
+    }),
+    prisma.expense.aggregate({
+      _sum: { monto: true },
+      where: {
+        userId,
+        sucursalId,
+        fecha: { gte: fechaApertura, lte: endDate },
+        categoria: CASH_WITHDRAWAL_CATEGORY,
+      },
+    }),
+  ]);
+
+  let ventasEfectivo = 0;
+  let ventasTarjeta = 0;
+  let ventasOtros = 0;
+
+  for (const row of salesByMethod) {
+    const amount = Number(row._sum.montoTotal || 0);
+    const method = String(row.metodoPago);
+
+    if (method === 'EFECTIVO') {
+      ventasEfectivo += amount;
+    } else if (CARD_METHODS.has(method)) {
+      ventasTarjeta += amount;
+    } else if (OTHER_NON_CASH_METHODS.has(method)) {
+      ventasOtros += amount;
+    } else {
+      ventasOtros += amount;
+    }
+  }
+
+  const gastosOperativos = Number(operationalExpensesAgg._sum.monto || 0);
+  const retirosEfectivo = Number(withdrawalsAgg._sum.monto || 0);
+  const ventasTotales = ventasEfectivo + ventasTarjeta + ventasOtros;
+
+  return {
+    ventasTotales,
+    ventasEfectivo,
+    ventasTarjeta,
+    ventasOtros,
+    gastosOperativos,
+    retirosEfectivo,
+  };
+};
+
 // GET: Check active session for current user
 export async function GET(request: Request) {
   const session = await auth();
@@ -20,36 +96,31 @@ export async function GET(request: Request) {
     return NextResponse.json({ active: false });
   }
 
-  // Calculate realtime totals
-  const [salesAgg, expensesAgg] = await Promise.all([
-    prisma.sale.aggregate({
-      _sum: { montoTotal: true },
-      where: {
-        userId: activeCut.userId,
-        sucursalId: activeCut.sucursalId,
-        createdAt: { gte: activeCut.fechaApertura }
-      }
-    }),
-    prisma.expense.aggregate({
-      _sum: { monto: true },
-      where: {
-        userId: activeCut.userId,
-        sucursalId: activeCut.sucursalId,
-        createdAt: { gte: activeCut.fechaApertura }
-      }
-    })
-  ]);
+  const metrics = await calculateCashCutMetrics(
+    activeCut.userId,
+    activeCut.sucursalId,
+    activeCut.fechaApertura,
+    activeCut.fechaCierre
+  );
 
-  const salesTotal = Number(salesAgg._sum.montoTotal || 0);
-  const expensesTotal = Number(expensesAgg._sum.monto || 0);
+  const totalEsperadoCaja =
+    Number(activeCut.montoInicial) +
+    metrics.ventasEfectivo -
+    metrics.gastosOperativos -
+    metrics.retirosEfectivo;
 
   return NextResponse.json({
     active: true,
     data: {
       ...activeCut,
-      ventasSistema: salesTotal,
-      gastosSistema: expensesTotal,
-      totalEsperado: Number(activeCut.montoInicial) + salesTotal - expensesTotal
+      ventasSistema: metrics.ventasTotales,
+      ventasEfectivo: metrics.ventasEfectivo,
+      ventasTarjeta: metrics.ventasTarjeta,
+      ventasOtros: metrics.ventasOtros,
+      gastosSistema: metrics.gastosOperativos,
+      retirosSistema: metrics.retirosEfectivo,
+      totalEsperadoCaja,
+      totalEsperado: totalEsperadoCaja,
     }
   });
 }
@@ -100,29 +171,14 @@ export async function PUT(request: Request) {
     return NextResponse.json({ message: 'Corte no válido o ya cerrado' }, { status: 400 });
   }
 
-  // Recalculate finals one last time
-  const [salesAgg, expensesAgg] = await Promise.all([
-    prisma.sale.aggregate({
-      _sum: { montoTotal: true },
-      where: {
-        userId: cut.userId,
-        sucursalId: cut.sucursalId,
-        createdAt: { gte: cut.fechaApertura }
-      }
-    }),
-    prisma.expense.aggregate({
-      _sum: { monto: true },
-      where: {
-        userId: cut.userId,
-        sucursalId: cut.sucursalId,
-        createdAt: { gte: cut.fechaApertura }
-      }
-    })
-  ]);
+  const metrics = await calculateCashCutMetrics(cut.userId, cut.sucursalId, cut.fechaApertura, null);
 
-  const salesTotal = Number(salesAgg._sum.montoTotal || 0);
-  const expensesTotal = Number(expensesAgg._sum.monto || 0);
-  const expected = Number(cut.montoInicial) + salesTotal - expensesTotal;
+  const expected =
+    Number(cut.montoInicial) +
+    metrics.ventasEfectivo -
+    metrics.gastosOperativos -
+    metrics.retirosEfectivo;
+
   const real = Number(montoFinal);
   const diff = real - expected;
 
@@ -132,8 +188,8 @@ export async function PUT(request: Request) {
     where: { id: cut.id },
     data: {
       fechaCierre: now,
-      ventasSistema: salesTotal,
-      gastosSistema: expensesTotal,
+      ventasSistema: metrics.ventasTotales,
+      gastosSistema: metrics.gastosOperativos + metrics.retirosEfectivo,
       montoFinal: real,
       diferencia: diff
     }
@@ -147,8 +203,8 @@ export async function PUT(request: Request) {
     fechaApertura: cut.fechaApertura,
     fechaCierre: now,
     montoInicial: Number(cut.montoInicial),
-    ventas: salesTotal,
-    gastos: expensesTotal,
+    ventas: metrics.ventasTotales,
+    gastos: metrics.gastosOperativos + metrics.retirosEfectivo,
     totalCalculado: expected,
     totalReal: real,
     diferencia: diff,

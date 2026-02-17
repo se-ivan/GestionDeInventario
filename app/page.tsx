@@ -69,6 +69,12 @@ export default function PointOfSale() {
     concept: "",
     category: "VARIOS"
   })
+  const [isWithdrawalModalOpen, setIsWithdrawalModalOpen] = useState(false)
+  const [isWithdrawalSubmitting, setIsWithdrawalSubmitting] = useState(false)
+  const [newWithdrawal, setNewWithdrawal] = useState({
+    amount: "",
+    reason: "",
+  })
 
   // Feedback Modal State
   const [feedbackModal, setFeedbackModal] = useState<{
@@ -249,6 +255,7 @@ export default function PointOfSale() {
         })
         setIsExpenseModalOpen(false)
         setNewExpense({ amount: "", concept: "", category: "VARIOS" })
+        checkCashSession()
       } else {
         const errorData = await res.json()
         setFeedbackModal({
@@ -268,6 +275,61 @@ export default function PointOfSale() {
       })
     } finally {
       setIsExpenseSubmitting(false)
+    }
+  }
+
+  const handleCashWithdrawal = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!cashSession) {
+      setFeedbackModal({
+        isOpen: true,
+        type: 'error',
+        title: 'Caja no disponible',
+        message: 'Necesitas una caja abierta para registrar retiros de efectivo.'
+      })
+      return
+    }
+
+    setIsWithdrawalSubmitting(true)
+    try {
+      const res = await fetch('/api/corte-caja/retiro', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          amount: newWithdrawal.amount,
+          reason: newWithdrawal.reason,
+        }),
+      })
+
+      const data = await res.json()
+      if (res.ok) {
+        setFeedbackModal({
+          isOpen: true,
+          type: 'success',
+          title: 'Retiro registrado',
+          message: 'El retiro de efectivo se guardó correctamente y fue aplicado al corte de caja.'
+        })
+        setIsWithdrawalModalOpen(false)
+        setNewWithdrawal({ amount: '', reason: '' })
+        checkCashSession()
+      } else {
+        setFeedbackModal({
+          isOpen: true,
+          type: 'error',
+          title: 'No se pudo registrar el retiro',
+          message: data?.message || 'Intenta nuevamente.'
+        })
+      }
+    } catch (error) {
+      console.error(error)
+      setFeedbackModal({
+        isOpen: true,
+        type: 'error',
+        title: 'Error de red',
+        message: 'No fue posible registrar el retiro.'
+      })
+    } finally {
+      setIsWithdrawalSubmitting(false)
     }
   }
 
@@ -483,6 +545,7 @@ export default function PointOfSale() {
         setSearchResults([]);
         setSearchTerm("");
         setDiscountPercent(0); // Reiniciar descuento
+        checkCashSession()
       } else {
         throw new Error(data.message || "Error al procesar la venta");
       }
@@ -556,7 +619,7 @@ export default function PointOfSale() {
                   <DialogTrigger asChild>
                     <Button 
                       variant="outline"
-                      className="bg-white text-primary border-primary hover:bg-slate-50 border"
+                      className="bg-white text-slate-700 border-slate-200 hover:bg-slate-50 shadow-sm"
                     >
                       Registrar Gasto
                     </Button>
@@ -598,7 +661,7 @@ export default function PointOfSale() {
                                 <Label htmlFor="category">Categoría</Label>
                                 <select 
                                     id="category"
-                                    className="flex h-10 w-full items-center justify-between rounded-md border border-slate-200 bg-white px-3 py-2 text-sm ring-offset-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-950 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                className="flex h-10 w-full items-center justify-between rounded-md border border-slate-200 bg-white px-3 py-2 text-sm ring-offset-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:ring-offset-0 disabled:cursor-not-allowed disabled:opacity-50"
                                     value={newExpense.category}
                                     onChange={e => setNewExpense({...newExpense, category: e.target.value})}
                                 >
@@ -622,6 +685,61 @@ export default function PointOfSale() {
                     </form>
                   </DialogContent>
                 </Dialog>
+
+                <Dialog open={isWithdrawalModalOpen} onOpenChange={setIsWithdrawalModalOpen}>
+                  <DialogTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className="bg-white text-amber-700 border-amber-300 hover:bg-amber-50 border"
+                      disabled={!cashSession}
+                    >
+                      Retiro de efectivo
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Retiro de efectivo</DialogTitle>
+                      <DialogDescription>
+                        Registra un retiro de la caja para mantener ordenado el cierre del turno.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <form onSubmit={handleCashWithdrawal} className="space-y-4 py-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="withdrawalReason">Motivo</Label>
+                        <Input
+                          id="withdrawalReason"
+                          value={newWithdrawal.reason}
+                          onChange={(e) => setNewWithdrawal((prev) => ({ ...prev, reason: e.target.value }))}
+                          placeholder="Ej. Depósito parcial, seguridad, resguardo"
+                          required
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="withdrawalAmount">Monto a retirar</Label>
+                        <Input
+                          id="withdrawalAmount"
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={newWithdrawal.amount}
+                          onChange={(e) => setNewWithdrawal((prev) => ({ ...prev, amount: e.target.value }))}
+                          placeholder="0.00"
+                          className="font-mono"
+                          required
+                        />
+                      </div>
+                      <DialogFooter>
+                        <Button type="button" variant="ghost" onClick={() => setIsWithdrawalModalOpen(false)}>
+                          Cancelar
+                        </Button>
+                        <Button type="submit" disabled={isWithdrawalSubmitting} className="bg-amber-600 hover:bg-amber-700">
+                          {isWithdrawalSubmitting ? <Loader2 className="animate-spin mr-2" /> : null}
+                          Registrar retiro
+                        </Button>
+                      </DialogFooter>
+                    </form>
+                  </DialogContent>
+                </Dialog>
             </div>
           </div>
           <div className="flex items-center gap-3">
@@ -630,7 +748,7 @@ export default function PointOfSale() {
               value={selectedSucursal || ""}
               onChange={(e) => handleSucursalChange(Number(e.target.value))}
               disabled={!!cashSession}
-              className={`bg-slate-50 border border-slate-300 text-slate-900 text-sm rounded-lg focus:ring-blue-500 block p-2.5 min-w-[200px] ${cashSession ? 'opacity-50 cursor-not-allowed' : ''}`}
+              className={`bg-slate-50 border border-slate-200 text-slate-700 text-sm rounded-lg focus:ring-2 focus:ring-primary/30 focus:ring-offset-0 block p-2.5 min-w-[200px] ${cashSession ? 'opacity-50 cursor-not-allowed' : ''}`}
             >
               <option value="" disabled>Seleccionar Sucursal</option>
               {sucursales.map(s => <option key={s.id} value={s.id}>{s.nombre}</option>)}
@@ -947,16 +1065,28 @@ export default function PointOfSale() {
                              <p className="font-semibold">${Number(cashSession.montoInicial).toFixed(2)}</p>
                          </div>
                          <div>
-                             <p className="text-xs text-slate-500">Ventas Sistema</p>
-                             <p className="font-semibold text-green-600">+${Number(cashSession.ventasSistema).toFixed(2)}</p>
+                         <p className="text-xs text-slate-500">Ventas en efectivo</p>
+                         <p className="font-semibold text-green-600">+${Number(cashSession.ventasEfectivo || 0).toFixed(2)}</p>
                          </div>
                          <div>
-                             <p className="text-xs text-slate-500">Gastos Registrados</p>
-                             <p className="font-semibold text-red-600">-${Number(cashSession.gastosSistema).toFixed(2)}</p>
+                         <p className="text-xs text-slate-500">Ventas con tarjeta</p>
+                         <p className="font-semibold text-blue-600">${Number(cashSession.ventasTarjeta || 0).toFixed(2)}</p>
+                       </div>
+                       <div>
+                         <p className="text-xs text-slate-500">Ventas por otros métodos</p>
+                         <p className="font-semibold text-cyan-600">${Number(cashSession.ventasOtros || 0).toFixed(2)}</p>
+                       </div>
+                       <div>
+                         <p className="text-xs text-slate-500">Gastos operativos</p>
+                         <p className="font-semibold text-red-600">-${Number(cashSession.gastosSistema || 0).toFixed(2)}</p>
+                       </div>
+                       <div>
+                         <p className="text-xs text-slate-500">Retiros de efectivo</p>
+                         <p className="font-semibold text-amber-600">-${Number(cashSession.retirosSistema || 0).toFixed(2)}</p>
                          </div>
                          <div className="border-t border-slate-200 pt-2 mt-2 col-span-2">
                              <p className="text-sm font-bold text-slate-700">Total Esperado en Caja</p>
-                             <p className="text-2xl font-black text-slate-900">${(Number(cashSession.totalEsperado)).toFixed(2)}</p>
+                         <p className="text-2xl font-black text-slate-900">${(Number(cashSession.totalEsperadoCaja ?? cashSession.totalEsperado)).toFixed(2)}</p>
                          </div>
                      </div>
 
@@ -970,8 +1100,8 @@ export default function PointOfSale() {
                             onChange={e => setCloseAmount(e.target.value)}
                          />
                          {closeAmount && (
-                             <div className={`text-sm font-medium ${Number(closeAmount) - Number(cashSession.totalEsperado) >= -1 && Number(closeAmount) - Number(cashSession.totalEsperado) <= 1 ? 'text-green-600' : 'text-red-600'}`}>
-                                 Diferencia: ${(Number(closeAmount) - Number(cashSession.totalEsperado)).toFixed(2)}
+                           <div className={`text-sm font-medium ${Number(closeAmount) - Number(cashSession.totalEsperadoCaja ?? cashSession.totalEsperado) >= -1 && Number(closeAmount) - Number(cashSession.totalEsperadoCaja ?? cashSession.totalEsperado) <= 1 ? 'text-green-600' : 'text-red-600'}`}>
+                             Diferencia: ${(Number(closeAmount) - Number(cashSession.totalEsperadoCaja ?? cashSession.totalEsperado)).toFixed(2)}
                              </div>
                          )}
                      </div>

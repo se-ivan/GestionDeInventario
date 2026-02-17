@@ -156,7 +156,7 @@ function computeRangeFor15And25(startParam?: string | null, endParam?: string | 
   const today = new Date();
   const day = today.getDate();
 
-  if (day === 15) {
+  if (day === 16) {
     const end = new Date(today); end.setHours(23,59,59,999);
     const start = new Date(today); start.setMonth(start.getMonth() - 1); start.setDate(25); start.setHours(0,0,0,0);
     return { start, end };
@@ -405,11 +405,26 @@ export async function GET(request: Request) {
       await enviarExcelPorWhatsApp(excelBuffer, reportId, 'Libros Tasa 0', reportDateStr, UPLOADED_FILE_PATH);
     } catch (errSend) {
       console.error('Error enviando archivo por WhatsApp:', errSend);
-      return NextResponse.json({
-        success: false,
-        message: 'No se pudo enviar el archivo por WhatsApp.',
-        error: errSend instanceof Error ? errSend.message : String(errSend)
-      }, { status: 502 });
+      // Si no se pide descarga manual, retornamos error.
+      // Si se pide descarga manual, permitimos continuar para obtener el archivo aunque falle WhatsApp.
+      if (searchParams.get('download') !== 'true') {
+        return NextResponse.json({
+          success: false,
+          message: 'No se pudo enviar el archivo por WhatsApp.',
+          error: errSend instanceof Error ? errSend.message : String(errSend)
+        }, { status: 502 });
+      }
+    }
+
+    // Opción para descargar si se solicita manualmente
+    if (searchParams.get('download') === 'true') {
+      return new NextResponse(excelBuffer, {
+        status: 200,
+        headers: {
+          'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          'Content-Disposition': `attachment; filename="Reporte_Libros_Tasa0_${reportDateStr}.xlsx"`
+        }
+      });
     }
 
     if (format === 'json') {

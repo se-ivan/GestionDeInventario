@@ -3,6 +3,9 @@ import prisma from '@/lib/prisma';
 import * as XLSX from 'xlsx';
 import { auth } from '@/auth';
 
+const CASH_WITHDRAWAL_CATEGORY = 'RETIRO_EFECTIVO';
+const CARD_METHODS = new Set(['TARJETA', 'TARJETA_DEBITO', 'TARJETA_CREDITO']);
+
 export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const cutId = searchParams.get('id');
@@ -24,7 +27,7 @@ export async function GET(request: Request) {
         where: {
             userId: cut.userId,
             sucursalId: cut.sucursalId,
-            createdAt: {
+            fecha: {
                 gte: cut.fechaApertura,
                 lte: cut.fechaCierre || new Date() // If active, shows current
             }
@@ -37,13 +40,35 @@ export async function GET(request: Request) {
         where: {
             userId: cut.userId,
             sucursalId: cut.sucursalId,
-            createdAt: {
+            fecha: {
                 gte: cut.fechaApertura,
                 lte: cut.fechaCierre || new Date()
             }
         },
         orderBy: { createdAt: 'desc' }
     });
+
+    const ventasEfectivo = sales
+        .filter((sale) => String(sale.metodoPago) === 'EFECTIVO')
+        .reduce((acc, sale) => acc + Number(sale.montoTotal), 0);
+
+    const ventasTarjeta = sales
+        .filter((sale) => CARD_METHODS.has(String(sale.metodoPago)))
+        .reduce((acc, sale) => acc + Number(sale.montoTotal), 0);
+
+    const ventasOtros = sales
+        .filter((sale) => String(sale.metodoPago) !== 'EFECTIVO' && !CARD_METHODS.has(String(sale.metodoPago)))
+        .reduce((acc, sale) => acc + Number(sale.montoTotal), 0);
+
+    const gastosOperativos = expenses
+        .filter((expense) => expense.categoria !== CASH_WITHDRAWAL_CATEGORY)
+        .reduce((acc, expense) => acc + Number(expense.monto), 0);
+
+    const retirosEfectivo = expenses
+        .filter((expense) => expense.categoria === CASH_WITHDRAWAL_CATEGORY)
+        .reduce((acc, expense) => acc + Number(expense.monto), 0);
+
+    const totalEsperadoCaja = Number(cut.montoInicial) + ventasEfectivo - gastosOperativos - retirosEfectivo;
 
     // Create Workbook
     const wb = XLSX.utils.book_new();
@@ -58,9 +83,12 @@ export async function GET(request: Request) {
         ["Cierre", cut.fechaCierre ? cut.fechaCierre.toLocaleString("es-MX", { timeZone: "America/Mexico_City" }) : "En Curso"],
         [""],
         ["Monto Inicial (Fondo)", Number(cut.montoInicial)],
-        ["(+) Ventas Totales", Number(cut.ventasSistema)],
-        ["(-) Gastos Totales", Number(cut.gastosSistema)],
-        ["(=) Total Esperado", Number(cut.montoInicial) + Number(cut.ventasSistema) - Number(cut.gastosSistema)],
+        ["(+) Ventas Efectivo", ventasEfectivo],
+        ["(+) Ventas Tarjeta", ventasTarjeta],
+        ["(+) Ventas Otros", ventasOtros],
+        ["(-) Gastos Operativos", gastosOperativos],
+        ["(-) Retiros de Efectivo", retirosEfectivo],
+        ["(=) Total Esperado en Caja", totalEsperadoCaja],
         [""],
         ["Monto Real (Contado)", Number(cut.montoFinal || 0)],
         ["Diferencia", Number(cut.diferencia || 0)],
@@ -102,6 +130,22 @@ export async function GET(request: Request) {
 
     const wsGastos = XLSX.utils.aoa_to_sheet([["ID", "Hora", "Concepto", "Categoría", "Monto"], ...gastosMap]);
     XLSX.utils.book_append_sheet(wb, wsGastos, "Gastos");
+
+        // 4. Sheet RETIROS
+        const retiros = expenses.filter((expense) => expense.categoria === CASH_WITHDRAWAL_CATEGORY);
+        const retirosMap = retiros.map((expense) => ([
+            expense.id,
+            expense.createdAt.toLocaleTimeString("es-MX", { timeZone: "America/Mexico_City" }),
+            expense.concepto,
+            Number(expense.monto),
+        ]));
+
+        const wsRetiros = XLSX.utils.aoa_to_sheet([
+            ["ID", "Hora", "Motivo", "Monto"],
+            ...retirosMap,
+            ["", "", "TOTAL", retirosEfectivo],
+        ]);
+        XLSX.utils.book_append_sheet(wb, wsRetiros, "Retiros");
 
     // Generate Buffer
     const buffer = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
