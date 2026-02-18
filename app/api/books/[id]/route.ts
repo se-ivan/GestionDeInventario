@@ -19,6 +19,10 @@ export async function PUT(
       return NextResponse.json({ error: "El ID del libro no es válido" }, { status: 400 });
     }
 
+    const normalizedIsbn = body.isbn && String(body.isbn).trim() !== ""
+      ? String(body.isbn).trim()
+      : null;
+
     const updatedBook = await prisma.book.update({
       where: {
         id: bookId,
@@ -26,8 +30,10 @@ export async function PUT(
       data: {
         titulo: body.titulo,
         autor: body.autor,
-        precioVenta: body.precio, 
-        isbn: body.isbn,
+        precioVenta: body.precioVenta,
+        precioCompra: body.precioCompra,
+        tasaIva: body.tasaIva,
+        isbn: normalizedIsbn,
         editorial: body.editorial,
         coleccion: body.coleccion,
         anioPublicacion: body.anioPublicacion,
@@ -44,6 +50,13 @@ export async function PUT(
       return NextResponse.json(
         { error: 'El libro a actualizar no fue encontrado.' },
         { status: 404 }
+      );
+    }
+
+    if (error.code === 'P2002') {
+      return NextResponse.json(
+        { message: 'Ya existe otro libro con ese ISBN.' },
+        { status: 409 }
       );
     }
 

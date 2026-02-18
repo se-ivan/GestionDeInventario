@@ -11,6 +11,8 @@ export async function GET(request: Request) {
 
     const { searchParams } = new URL(request.url);
     const dateStr = searchParams.get('date'); // YYYY-MM-DD
+    const startDateStr = searchParams.get('startDate'); // YYYY-MM-DD
+    const endDateStr = searchParams.get('endDate'); // YYYY-MM-DD
     const sucursalId = searchParams.get('sucursalId');
     const page = Number(searchParams.get('page')) || 1;
     const limit = Number(searchParams.get('limit')) || 20;
@@ -19,16 +21,50 @@ export async function GET(request: Request) {
         fechaCierre: { not: null } // Only completed cuts? Or all? User said "movements... in a day", usually implies finished shifts.
     };
 
-    if (dateStr) {
-        // Filter by specific day (start of day to end of day)
-        // Adjust for timezone if needed, but simple string comparison or range is safer.
-        // Assuming dateStr is in user's local day, e.g. "2023-10-27"
-        const start = new Date(`${dateStr}T00:00:00`);
-        const end = new Date(`${dateStr}T23:59:59.999`);
-        whereClause.fechaApertura = {
-            gte: start,
-            lte: end
-        };
+    const parseStart = (value: string) => {
+        const parsed = new Date(`${value}T00:00:00.000`);
+        return Number.isNaN(parsed.getTime()) ? null : parsed;
+    };
+
+    const parseEnd = (value: string) => {
+        const parsed = new Date(`${value}T23:59:59.999`);
+        return Number.isNaN(parsed.getTime()) ? null : parsed;
+    };
+
+    if (startDateStr || endDateStr) {
+        const effectiveStart = startDateStr || endDateStr;
+        const effectiveEnd = endDateStr || startDateStr;
+
+        if (effectiveStart && effectiveEnd) {
+            let start = parseStart(effectiveStart);
+            let end = parseEnd(effectiveEnd);
+
+            if (start && end) {
+                if (start > end) {
+                    const tmpStart = start;
+                    start = parseStart(effectiveEnd)!;
+                    end = parseEnd(effectiveStart)!;
+                    if (!start || !end) {
+                        start = tmpStart;
+                    }
+                }
+
+                whereClause.fechaApertura = {
+                    gte: start,
+                    lte: end
+                };
+            }
+        }
+    } else if (dateStr) {
+        const start = parseStart(dateStr);
+        const end = parseEnd(dateStr);
+
+        if (start && end) {
+            whereClause.fechaApertura = {
+                gte: start,
+                lte: end
+            };
+        }
     }
 
     if (sucursalId) {

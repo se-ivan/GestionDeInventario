@@ -77,8 +77,8 @@ interface DulceFormData {
   lineaProducto: string
   peso: string
   sabor: string
-  precioCompra: number
-  precioVenta: number
+  precioCompra: number | ""
+  precioVenta: number | ""
   tasaIva: number
   sucursalId: number
   stock: number
@@ -93,8 +93,8 @@ const INITIAL_FORM: DulceFormData = {
   lineaProducto: "",
   peso: "",
   sabor: "",
-  precioCompra: 0,
-  precioVenta: 0,
+  precioCompra: "",
+  precioVenta: "",
   tasaIva: 8,
   sucursalId: 0,
   stock: 0,
@@ -288,10 +288,16 @@ export default function DulceriaPage() {
 
     try {
       const method = isEditing ? 'PUT' : 'POST';
+      const payload = {
+        ...formData,
+        precioCompra: formData.precioCompra === "" ? 0 : Number(formData.precioCompra),
+        precioVenta: formData.precioVenta === "" ? 0 : Number(formData.precioVenta),
+      }
+
       const res = await fetch('/api/dulces', {
         method: method,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData)
+        body: JSON.stringify(payload)
       })
 
       if (res.ok) {
@@ -494,7 +500,7 @@ export default function DulceriaPage() {
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="precioCompra">Costo Compra ($)</Label>
-                      <Input type="number" step="0.01" min="0" placeholder="0.00" value={formData.precioCompra} onChange={e => handleInputChange('precioCompra', Number(e.target.value))} />
+                      <Input type="number" step="0.01" min="0" placeholder="0.00" value={formData.precioCompra} onChange={e => handleInputChange('precioCompra', e.target.value === '' ? '' : Number(e.target.value))} />
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="precioVenta">Precio Venta ($) <span className="text-red-500">*</span></Label>
@@ -505,7 +511,7 @@ export default function DulceriaPage() {
                         min="0" 
                         placeholder="0.00"
                         value={formData.precioVenta} 
-                        onChange={e => handleInputChange('precioVenta', Number(e.target.value))} 
+                        onChange={e => handleInputChange('precioVenta', e.target.value === '' ? '' : Number(e.target.value))} 
                         required 
                       />
                     </div>

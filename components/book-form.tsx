@@ -14,8 +14,8 @@ interface ExtendedFormData {
   isbn: string;
   titulo: string;
   autor: string;
-  precioVenta: number;
-  precioCompra: number;
+  precioVenta: number | "";
+  precioCompra: number | "";
   tasaIva: number;
   editorial: string;
   coleccion: string;
@@ -44,8 +44,12 @@ export function BookForm({ initialData, onSubmit, onCancel, isEditing = false, s
     isbn: initialData?.book?.isbn || "",
     titulo: initialData?.book?.titulo || "",
     autor: initialData?.book?.autor || "",
-    precioVenta: Number(initialData?.book?.precioVenta) || 0,
-    precioCompra: Number(initialData?.book?.precioCompra) || 0,
+    precioVenta: initialData?.book?.precioVenta !== undefined && initialData?.book?.precioVenta !== null
+      ? Number(initialData.book.precioVenta)
+      : "",
+    precioCompra: initialData?.book?.precioCompra !== undefined && initialData?.book?.precioCompra !== null
+      ? Number(initialData.book.precioCompra)
+      : "",
     tasaIva: Number(initialData?.book?.tasaIva) || 0,
     editorial: initialData?.book?.editorial || "",
     coleccion: initialData?.book?.coleccion || "",
@@ -71,6 +75,7 @@ export function BookForm({ initialData, onSubmit, onCancel, isEditing = false, s
 
   // --- LÓGICA DE BÚSQUEDA INTELIGENTE ---
   const handleSmartSearch = async () => {
+    if (isEditing) return;
     if (!formData.isbn) return; // Si está vacío, no hacemos nada
 
     setIsSearching(true);
@@ -155,10 +160,18 @@ export function BookForm({ initialData, onSubmit, onCancel, isEditing = false, s
       return;
     }
 
+    if (formData.precioVenta === "" || Number(formData.precioVenta) <= 0) {
+      setSubmitError("Por favor ingresa un precio de venta mayor a 0.");
+      setIsSubmitting(false);
+      return;
+    }
+
     try {
       const payload = {
         bookData: {
           ...formData,
+          precioVenta: Number(formData.precioVenta),
+          precioCompra: formData.precioCompra === "" ? 0 : Number(formData.precioCompra),
           isbn: formData.isbn || null
         },
         inventoryData: {
@@ -189,7 +202,7 @@ export function BookForm({ initialData, onSubmit, onCancel, isEditing = false, s
       <div className="flex-1 overflow-y-auto max-h-[70vh] px-1 pr-2 space-y-6">
 
         {/* --- ALERTA: LIBRO EXISTENTE --- */}
-        {isExistingBook && (
+        {isExistingBook && !isEditing && (
           <div className="bg-blue-50 border border-blue-200 text-blue-800 px-4 py-3 rounded-md flex items-center gap-3 animate-in fade-in slide-in-from-top-2">
             <CheckCircle2 className="h-5 w-5 text-blue-600" />
             <div>
@@ -227,12 +240,12 @@ export function BookForm({ initialData, onSubmit, onCancel, isEditing = false, s
                     }}
                     onBlur={() => {
                       // Buscar automáticamente al salir del campo si hay texto y no hemos confirmado existencia
-                      if (formData.isbn && !isExistingBook) handleSmartSearch();
+                      if (!isEditing && formData.isbn && !isExistingBook) handleSmartSearch();
                     }}
                     placeholder="Escanea o escribe..."
                     className={isExistingBook ? "border-blue-300 ring-blue-100" : ""}
                   />
-                  <Button type="button" onClick={handleSmartSearch} disabled={isSearching} variant="secondary">
+                  <Button type="button" onClick={handleSmartSearch} disabled={isSearching || isEditing} variant="secondary">
                     {isSearching ? <Loader2 className="animate-spin h-4 w-4" /> : <Search className="h-4 w-4" />}
                   </Button>
                 </div>
@@ -283,7 +296,7 @@ export function BookForm({ initialData, onSubmit, onCancel, isEditing = false, s
                 <Input
                   id="precioCompra" type="number" step="0.01" min="0"
                   value={formData.precioCompra}
-                  onChange={(e) => handleInputChange("precioCompra", Number(e.target.value))}
+                  onChange={(e) => handleInputChange("precioCompra", e.target.value === "" ? "" : Number(e.target.value))}
                   disabled={isExistingBook}
                   className={isExistingBook ? "bg-slate-100" : ""}
                 />
@@ -293,7 +306,7 @@ export function BookForm({ initialData, onSubmit, onCancel, isEditing = false, s
                 <Input
                   id="precioVenta" type="number" step="0.01" min="0" required
                   value={formData.precioVenta}
-                  onChange={(e) => handleInputChange("precioVenta", Number(e.target.value))}
+                  onChange={(e) => handleInputChange("precioVenta", e.target.value === "" ? "" : Number(e.target.value))}
                   disabled={isExistingBook}
                   className={`font-bold ${isExistingBook ? "bg-slate-100 text-slate-600" : "text-green-700 bg-green-50"}`}
                 />

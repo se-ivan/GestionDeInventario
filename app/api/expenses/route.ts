@@ -60,23 +60,48 @@ export async function GET(request: Request) {
   try {
      const { searchParams } = new URL(request.url);
      const date = searchParams.get('date');
+    const startDate = searchParams.get('startDate');
+    const endDate = searchParams.get('endDate');
      
      // Filtro opcional por fecha (útil para el reporte diario)
      const whereClause: any = {};
-     if (date) {
-        // Ajuste de zona horaria para México (UTC-6)
-        // Buscamos desde las 06:00 UTC del día seleccionado hasta las 06:00 UTC del día siguiente
-        const start = new Date(date);
-        start.setUTCHours(6, 0, 0, 0);
-        
-        const end = new Date(date);
-        end.setDate(end.getDate() + 1);
-        end.setUTCHours(6, 0, 0, 0); // Usamos < end, o continuamos con lte 5:59
+    const toUtcMexicoStart = (value: string) => {
+      const parsed = new Date(value);
+      if (Number.isNaN(parsed.getTime())) return null;
+      parsed.setUTCHours(6, 0, 0, 0);
+      return parsed;
+    };
 
-        whereClause.fecha = {
-           gte: start,
-           lt: end 
-        };
+    const toUtcMexicoEndExclusive = (value: string) => {
+      const parsed = new Date(value);
+      if (Number.isNaN(parsed.getTime())) return null;
+      parsed.setDate(parsed.getDate() + 1);
+      parsed.setUTCHours(6, 0, 0, 0);
+      return parsed;
+    };
+
+    const effectiveStartDate = startDate || date;
+    const effectiveEndDate = endDate || date || startDate;
+
+    if (effectiveStartDate && effectiveEndDate) {
+      let startValue = effectiveStartDate;
+      let endValue = effectiveEndDate;
+
+      if (startValue > endValue) {
+       const temp = startValue;
+       startValue = endValue;
+       endValue = temp;
+      }
+
+      const start = toUtcMexicoStart(startValue);
+      const end = toUtcMexicoEndExclusive(endValue);
+
+      if (start && end) {
+       whereClause.fecha = {
+         gte: start,
+         lt: end 
+       };
+      }
      }
 
      const expenses = await prisma.expense.findMany({

@@ -27,12 +27,14 @@ interface Expense {
 }
 
 export default function ExpensesPage() {
+    const today = new Date().toISOString().split('T')[0]
   const [expenses, setExpenses] = useState<Expense[]>([])
   const [loading, setLoading] = useState(true)
   const [stats, setStats] = useState({ total: 0, count: 0 })
   
-  // Date Filter
-  const [dateFilter, setDateFilter] = useState(new Date().toISOString().split('T')[0])
+    // Date Filter
+    const [startDate, setStartDate] = useState(today)
+    const [endDate, setEndDate] = useState(today)
 
   // Edit/Create Modal
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -46,7 +48,11 @@ export default function ExpensesPage() {
   const fetchExpenses = async () => {
     setLoading(true)
     try {
-      const res = await fetch(`/api/expenses?date=${dateFilter}`)
+            const params = new URLSearchParams()
+            if (startDate) params.append('startDate', startDate)
+            if (endDate) params.append('endDate', endDate)
+
+            const res = await fetch(`/api/expenses?${params.toString()}`)
       if (res.ok) {
         const data = await res.json()
         setExpenses(data)
@@ -64,7 +70,7 @@ export default function ExpensesPage() {
 
   useEffect(() => {
     fetchExpenses()
-  }, [dateFilter])
+    }, [startDate, endDate])
 
   const handleDeleteClick = (id: number) => {
     setDeleteDialog({ isOpen: true, id });
@@ -139,6 +145,7 @@ export default function ExpensesPage() {
 
   const formatCurrency = (val: number) => new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(val)
   const formatDate = (date: string) => new Date(date).toLocaleString('es-MX', { day: '2-digit', month: 'short', hour: '2-digit', minute:'2-digit' })
+    const dateLabel = startDate === endDate ? startDate : `${startDate} a ${endDate}`
 
   return (
     <div className="min-h-screen bg-slate-50/50 p-6 font-sans space-y-8">
@@ -154,8 +161,17 @@ export default function ExpensesPage() {
                 <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                 <Input 
                     type="date" 
-                    value={dateFilter} 
-                    onChange={e => setDateFilter(e.target.value)}
+                    value={startDate} 
+                    onChange={e => setStartDate(e.target.value)}
+                    className="pl-10 bg-white"
+                />
+            </div>
+            <div className="relative">
+                <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                <Input 
+                    type="date" 
+                    value={endDate} 
+                    onChange={e => setEndDate(e.target.value)}
                     className="pl-10 bg-white"
                 />
             </div>
@@ -175,7 +191,7 @@ export default function ExpensesPage() {
                 <ArrowUpRight className="w-24 h-24" />
             </div>
             <div>
-                <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Total Gastado ({dateFilter})</p>
+                <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Total Gastado ({dateLabel})</p>
                 <h3 className="text-3xl font-bold text-slate-800 mt-2">{formatCurrency(stats.total)}</h3>
             </div>
         </Card>
@@ -212,7 +228,7 @@ export default function ExpensesPage() {
                 {loading ? (
                     <TableRow className="border-0"><TableCell colSpan={7} className="h-32 text-center text-slate-400"><Loader2 className="animate-spin inline mr-2" /> Cargando...</TableCell></TableRow>
                 ) : expenses.length === 0 ? (
-                    <TableRow className="border-0"><TableCell colSpan={7} className="h-32 text-center text-slate-400">No se encontraron registros para esta fecha.</TableCell></TableRow>
+                    <TableRow className="border-0"><TableCell colSpan={7} className="h-32 text-center text-slate-400">No se encontraron registros para este rango.</TableCell></TableRow>
                 ) : (
                     expenses.map((expense) => (
                     <TableRow key={expense.id} className="border-0 hover:bg-slate-50/80 transition-colors">

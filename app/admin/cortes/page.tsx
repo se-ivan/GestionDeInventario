@@ -12,7 +12,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { FileDown, Calendar, Search, Loader2 } from "lucide-react"
+import { FileDown, Search, Loader2 } from "lucide-react"
 import { Sucursal } from "@/lib/types"
 
 interface CorteHistory {
@@ -29,9 +29,11 @@ interface CorteHistory {
 }
 
 export default function CortesHistoryPage() {
+  const today = new Date().toISOString().split('T')[0]
   const [data, setData] = useState<CorteHistory[]>([])
   const [loading, setLoading] = useState(true)
-  const [dateFilter, setDateFilter] = useState<string>(new Date().toISOString().split('T')[0])
+  const [startDate, setStartDate] = useState<string>(today)
+  const [endDate, setEndDate] = useState<string>(today)
   const [sucursales, setSucursales] = useState<Sucursal[]>([])
   const [selectedSucursal, setSelectedSucursal] = useState<string>("")
   
@@ -43,7 +45,7 @@ export default function CortesHistoryPage() {
 
   useEffect(() => {
     fetchHistory()
-  }, [dateFilter, selectedSucursal, pagination.page])
+  }, [startDate, endDate, selectedSucursal, pagination.page])
 
   const fetchSucursales = async () => {
     try {
@@ -59,7 +61,8 @@ export default function CortesHistoryPage() {
             page: pagination.page.toString(),
             limit: pagination.limit.toString()
         })
-        if (dateFilter) params.append('date', dateFilter)
+        if (startDate) params.append('startDate', startDate)
+        if (endDate) params.append('endDate', endDate)
         if (selectedSucursal) params.append('sucursalId', selectedSucursal)
 
         const res = await fetch(`/api/corte-caja/history?${params}`)
@@ -90,19 +93,37 @@ export default function CortesHistoryPage() {
           </div>
           <div className="flex gap-2 items-center">
              <div className="flex flex-col">
-                <span className="text-[10px] uppercase font-bold text-slate-400">Fecha</span>
+               <span className="text-[10px] uppercase font-bold text-slate-400">Desde</span>
                 <Input 
                    type="date" 
-                   value={dateFilter} 
-                   onChange={e => setDateFilter(e.target.value)} 
+                 value={startDate} 
+                 onChange={e => {
+                  setStartDate(e.target.value)
+                  setPagination(prev => ({ ...prev, page: 1 }))
+                 }} 
                    className="w-40 h-9"
                 />
+             </div>
+             <div className="flex flex-col">
+               <span className="text-[10px] uppercase font-bold text-slate-400">Hasta</span>
+               <Input 
+                 type="date" 
+                 value={endDate} 
+                 onChange={e => {
+                  setEndDate(e.target.value)
+                  setPagination(prev => ({ ...prev, page: 1 }))
+                 }} 
+                 className="w-40 h-9"
+               />
              </div>
              <div className="flex flex-col">
                 <span className="text-[10px] uppercase font-bold text-slate-400">Sucursal</span>
                 <select
                     value={selectedSucursal}
-                    onChange={e => setSelectedSucursal(e.target.value)}
+                  onChange={e => {
+                   setSelectedSucursal(e.target.value)
+                   setPaginat ion(prev => ({ ...prev, page: 1 }))
+                  }}
                     className="h-9 w-40 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                 >
                     <option value="">Todas</option>
@@ -117,8 +138,8 @@ export default function CortesHistoryPage() {
 
        <Card>
          <CardContent className="p-0">
-           <Table>
-             <TableHeader>
+           <Table className="border-separate">
+             <TableHeader >
                <TableRow>
                  <TableHead>Fecha / Hora</TableHead>
                  <TableHead>Sucursal</TableHead>
@@ -141,7 +162,7 @@ export default function CortesHistoryPage() {
                ) : data.length === 0 ? (
                    <TableRow>
                        <TableCell colSpan={9} className="h-24 text-center text-slate-500">
-                           No se encontraron cortes en la fecha seleccionada.
+                         No se encontraron cortes en el rango seleccionado.
                        </TableCell>
                    </TableRow>
                ) : (
