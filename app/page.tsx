@@ -17,10 +17,12 @@ import {
 } from "@/components/ui/dialog"
 import {
   ShoppingCartIcon, BookOpen, Search, Loader2, Minus, Plus,
-  Store, Trash2, Percent, CheckCircle2, Candy, ScanBarcode, ArrowUpRight, AlertCircle, FileDown
+  Store, Trash2, Percent, CheckCircle2, Candy, ScanBarcode, ArrowUpRight, AlertCircle, FileDown,
+  ChevronLeft, ChevronRight, Check
 } from "lucide-react"
 import { Sucursal } from "@/lib/types"
 import { logout } from "@/actions/logout"
+import { useSession } from "next-auth/react"
 
 interface ProductEntry {
   uniqueId: string;
@@ -41,6 +43,37 @@ interface CartItem extends ProductEntry {
   quantity: number
 }
 
+interface PendingSearch {
+  id: number
+  titulo: string
+  autor: string
+  isbn: string
+  editorial: string
+  genero: string
+  descripcion: string
+  precio_estimado: number | null
+  cliente_nombre: string
+  cliente_telefono: string
+  cliente_email: string
+  cliente_notas: string
+  estado: "pendiente" | "buscando" | "encontrado" | "entregado" | "cancelado"
+  prioridad: "baja" | "media" | "alta" | "urgente"
+  fecha_solicitud: string
+  fecha_limite: string
+  fecha_actualizacion: string
+  notas_internas: string
+  precio_encontrado?: number
+  proveedor_encontrado?: string
+}
+
+const pendingStatusLabels: Record<PendingSearch["estado"], string> = {
+  pendiente: "Pendiente",
+  buscando: "Buscando",
+  encontrado: "Encontrado",
+  entregado: "Entregado",
+  cancelado: "Cancelado",
+}
+
 const PAYMENT_METHODS = [
   { id: "EFECTIVO", label: "💵 Efectivo" },
   { id: "TARJETA_DEBITO", label: "💳 Tarjeta Débito" },
@@ -50,6 +83,10 @@ const PAYMENT_METHODS = [
 ]
 
 export default function PointOfSale() {
+  const { data: session } = useSession()
+  const hasPendingReminderPermission =
+    session?.user?.role === "ADMIN" ||
+    (session?.user?.permissions || []).includes("PENDING_REMINDER")
   const [searchTerm, setSearchTerm] = useState("")
   const [searchResults, setSearchResults] = useState<ProductEntry[]>([])
   const [cartItems, setCartItems] = useState<CartItem[]>([])
@@ -95,11 +132,106 @@ export default function PointOfSale() {
   const [openAmount, setOpenAmount] = useState("") 
   const [closeAmount, setCloseAmount] = useState("") // Real cash
   const [isClosingSession, setIsClosingSession] = useState(false) // Spinner state
+
+  const [isPendingReminderOpen, setIsPendingReminderOpen] = useState(false)
+  const [isPendingReminderLoading, setIsPendingReminderLoading] = useState(false)
+  const [pendingSearches, setPendingSearches] = useState<PendingSearch[]>([])
+  const [pendingSlideIndex, setPendingSlideIndex] = useState(0)
+  const [pendingStatusById, setPendingStatusById] = useState<Record<number, PendingSearch["estado"]>>({})
+  const [updatingPendingId, setUpdatingPendingId] = useState<number | null>(null)
   
   // --- LOAD SESSION ---
   useEffect(() => {
     checkCashSession()
   }, [])
+
+  useEffect(() => {
+    if (!hasPendingReminderPermission) {
+      setIsPendingReminderOpen(false)
+      return
+    }
+
+    const loadPendingSearches = async () => {
+      setIsPendingReminderLoading(true)
+      try {
+        const response = await fetch("/api/pending-searches")
+        if (!response.ok) return
+
+        const data: PendingSearch[] = await response.json()
+        const onlyPending = data.filter((item) => item.estado === "pendiente")
+
+        if (onlyPending.length > 0) {
+          setPendingSearches(onlyPending)
+          setPendingStatusById(
+            onlyPending.reduce((acc, item) => {
+              acc[item.id] = item.estado
+              return acc
+            }, {} as Record<number, PendingSearch["estado"]>)
+          )
+          setPendingSlideIndex(0)
+          setIsPendingReminderOpen(true)
+        }
+      } catch (error) {
+        console.error("Error cargando búsquedas pendientes:", error)
+      } finally {
+        setIsPendingReminderLoading(false)
+      }
+    }
+
+    loadPendingSearches()
+  }, [hasPendingReminderPermission])
+
+  const handleChangePendingStatus = async (searchId: number) => {
+    const selectedSearch = pendingSearches.find((item) => item.id === searchId)
+    if (!selectedSearch) return
+
+    const nextStatus = pendingStatusById[searchId] ?? selectedSearch.estado
+
+    setUpdatingPendingId(searchId)
+    try {
+      const response = await fetch(`/api/pending-searches/${searchId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...selectedSearch,
+          estado: nextStatus,
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error("No se pudo actualizar el estado")
+      }
+
+      if (nextStatus === "pendiente") {
+        setPendingSearches((prev) =>
+          prev.map((item) => (item.id === searchId ? { ...item, estado: nextStatus } : item))
+        )
+        return
+      }
+
+      setPendingSearches((prev) => {
+        const next = prev.filter((item) => item.id !== searchId)
+        if (next.length === 0) {
+          setIsPendingReminderOpen(false)
+          return next
+        }
+        if (pendingSlideIndex >= next.length) {
+          setPendingSlideIndex(next.length - 1)
+        }
+        return next
+      })
+    } catch (error) {
+      console.error("Error actualizando búsqueda pendiente:", error)
+      setFeedbackModal({
+        isOpen: true,
+        type: "error",
+        title: "Error al actualizar",
+        message: "No se pudo cambiar el estado de la búsqueda.",
+      })
+    } finally {
+      setUpdatingPendingId(null)
+    }
+  }
 
   const checkCashSession = async () => {
     setIsLoadingSession(true)
@@ -560,6 +692,7 @@ export default function PointOfSale() {
   const montoDescuento = subtotalBruto * (discountPercent / 100);
   const totalNeto = subtotalBruto - montoDescuento;
   const ivaEstimado = totalNeto - (totalNeto / 1.16);
+  const currentPendingSearch = pendingSearches[pendingSlideIndex]
 
   return (
     <div className="flex h-screen bg-slate-100 font-sans overflow-hidden relative">
@@ -586,6 +719,115 @@ export default function PointOfSale() {
           </Card>
         </div>
       )}
+
+      <Dialog open={isPendingReminderOpen} onOpenChange={setIsPendingReminderOpen}>
+        <DialogContent className="sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Recordatorio de búsquedas pendientes</DialogTitle>
+            <DialogDescription>
+              Tienes solicitudes de libros pendientes por atender. Puedes actualizar su estado desde aquí.
+            </DialogDescription>
+          </DialogHeader>
+
+          {isPendingReminderLoading ? (
+            <div className="py-8 flex items-center justify-center text-slate-500 text-sm">
+              <Loader2 className="h-4 w-4 animate-spin mr-2" /> Cargando pendientes...
+            </div>
+          ) : !currentPendingSearch ? (
+            <div className="py-8 text-center text-slate-600 text-sm">
+              No hay búsquedas pendientes por el momento.
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between text-sm text-slate-500">
+                <span>Solicitud {pendingSlideIndex + 1} de {pendingSearches.length}</span>
+                <span className="font-medium">Prioridad: {currentPendingSearch.prioridad}</span>
+              </div>
+
+              <Card className="border border-slate-200">
+                <div className="p-4 space-y-3">
+                  <div>
+                    <h3 className="text-lg font-bold text-slate-900">{currentPendingSearch.titulo}</h3>
+                    <p className="text-sm text-slate-600">{currentPendingSearch.autor || "Autor no especificado"}</p>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                    <div className="rounded-md bg-slate-50 p-3">
+                      <p className="text-slate-500">Cliente</p>
+                      <p className="font-medium text-slate-900">{currentPendingSearch.cliente_nombre}</p>
+                      <p className="text-slate-700">{currentPendingSearch.cliente_telefono}</p>
+                    </div>
+                    <div className="rounded-md bg-slate-50 p-3">
+                      <p className="text-slate-500">Fecha solicitud</p>
+                      <p className="font-medium text-slate-900">
+                        {new Date(currentPendingSearch.fecha_solicitud).toLocaleDateString("es-MX")}
+                      </p>
+                      <p className="text-slate-700">Estado actual: {pendingStatusLabels[currentPendingSearch.estado]}</p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] gap-3 items-end">
+                    <div className="space-y-1">
+                      <Label htmlFor={`pending-status-${currentPendingSearch.id}`}>Nuevo estado</Label>
+                      <select
+                        id={`pending-status-${currentPendingSearch.id}`}
+                        className="flex h-10 w-full items-center justify-between rounded-md border border-slate-200 bg-white px-3 py-2 text-sm ring-offset-white focus:outline-none focus:ring-2 focus:ring-primary/30 focus:ring-offset-0"
+                        value={pendingStatusById[currentPendingSearch.id] ?? currentPendingSearch.estado}
+                        onChange={(e) =>
+                          setPendingStatusById((prev) => ({
+                            ...prev,
+                            [currentPendingSearch.id]: e.target.value as PendingSearch["estado"],
+                          }))
+                        }
+                      >
+                        <option value="pendiente">Pendiente</option>
+                        <option value="buscando">Buscando</option>
+                        <option value="encontrado">Encontrado</option>
+                        <option value="entregado">Entregado</option>
+                        <option value="cancelado">Cancelado</option>
+                      </select>
+                    </div>
+                    <Button
+                      onClick={() => handleChangePendingStatus(currentPendingSearch.id)}
+                      disabled={updatingPendingId === currentPendingSearch.id}
+                      className="w-full md:w-auto"
+                    >
+                      {updatingPendingId === currentPendingSearch.id ? (
+                        <>
+                          <Loader2 className="h-4 w-4 animate-spin mr-2" /> Guardando...
+                        </>
+                      ) : (
+                        <>
+                          <Check className="h-4 w-4 mr-2" /> Actualizar estado
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </div>
+              </Card>
+
+              <div className="flex items-center justify-between">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setPendingSlideIndex((prev) => Math.max(prev - 1, 0))}
+                  disabled={pendingSlideIndex === 0}
+                >
+                  <ChevronLeft className="h-4 w-4 mr-2" /> Anterior
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setPendingSlideIndex((prev) => Math.min(prev + 1, pendingSearches.length - 1))}
+                  disabled={pendingSlideIndex >= pendingSearches.length - 1}
+                >
+                  Siguiente <ChevronRight className="h-4 w-4 ml-2" />
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* IZQUIERDA: PRODUCTOS */}
       <main className="flex-1 flex flex-col p-6 gap-6 overflow-hidden">

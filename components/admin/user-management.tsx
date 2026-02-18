@@ -28,9 +28,11 @@ const ALL_PERMISSIONS = [
   { id: "POS", label: "Punto de Venta" },
   { id: "INVENTORY", label: "Inventario (Libros)" },
   { id: "DASHBOARD", label: "Panel de Control" },
+    { id: "CLIENTS", label: "Clientes" },
   { id: "EXPENSES", label: "Gestión de Gastos" },
   { id: "CANDY", label: "Dulcería" },
   { id: "PENDING", label: "Búsquedas Pendientes" },
+    { id: "PENDING_REMINDER", label: "Modal recordatorio de pendientes" },
   { id: "CASH_CUTS", label: "Cortes de Caja" },
   { id: "APARTADOS", label: "Sistema de Apartados" },
 ];

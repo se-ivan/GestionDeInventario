@@ -4,15 +4,17 @@ import * as z from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
+import { signIn } from "next-auth/react";
 import { LoginSchema } from "@/schemas";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { CardWrapper } from "@/components/auth/card-wrapper";
 import { Button } from "@/components/ui/button";
-import { login } from "@/actions/login";
 import { Eye, EyeOff } from "lucide-react";
 
 export const LoginForm = () => {
+    const router = useRouter();
     const [error, setError] = useState<string | undefined>("");
     const [success, setSuccess] = useState<string | undefined>("");
     const [showPassword, setShowPassword] = useState(false);
@@ -35,10 +37,21 @@ export const LoginForm = () => {
         setSuccess("");
 
         startTransition(() => {
-            login(values).then((data) => {
-                if (data?.error) {
-                    setError(data.error);
+            signIn("credentials", {
+                email: values.email,
+                password: values.password,
+                redirect: false,
+            }).then((result) => {
+                if (result?.error) {
+                    setError("Credenciales inválidas");
+                    return;
                 }
+
+                setSuccess("Inicio de sesión exitoso");
+                router.push("/");
+                router.refresh();
+            }).catch(() => {
+                setError("Error de autenticación");
             });
         });
     };
