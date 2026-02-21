@@ -122,4 +122,36 @@
   body {
     @apply bg-background text-foreground;
   }
+
+  .rich-text-editor-content table {
+    border-collapse: collapse;
+    width: 100%;
+    margin: 0.75rem 0;
+  }
+
+  .rich-text-editor-content th,
+  .rich-text-editor-content td {
+    border: 1px solid var(--border);
+    padding: 0.5rem;
+    vertical-align: top;
+  }
+
+  .rich-text-editor-content th {
+    background-color: color-mix(in oklab, var(--muted) 100%, transparent);
+    font-weight: 600;
+  }
+
+  .rich-text-editor-content .selectedCell {
+    background-color: color-mix(in oklab, var(--muted) 45%, transparent);
+  }
+
+  .rich-text-editor-content .column-resize-handle {
+    background-color: var(--ring);
+    bottom: -2px;
+    pointer-events: none;
+    position: absolute;
+    right: -2px;
+    top: 0;
+    width: 4px;
+  }
 }

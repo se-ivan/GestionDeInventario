@@ -29,6 +29,11 @@ enum DiscountType {
   MONTO_FIJO
 }
 
+enum ArticleStatus {
+  BORRADOR
+  PUBLICADO
+}
+
 // --- USUARIOS Y SUCURSALES ---
 
 model User {
@@ -41,10 +46,12 @@ model User {
   sucursalId Int?        @map("sucursal_id")
   sucursal   Sucursal?   @relation(fields: [sucursalId], references: [id])
   permisos   String[]    @default([])
+  librosDelMes LibroDelMes[]
   sales      Sale[]
   apartados  Apartado[]
   cajas      CorteCaja[]
   expenses   Expense[]
+  noticias   Noticia[]
 
   createdAt DateTime @default(now()) @map("created_at")
 
@@ -97,6 +104,7 @@ model Book {
   saleDetails SaleDetail[]
   apartadoItems ApartadoItem[]
   discounts   DiscountCampaign[]
+  librosDelMes LibroDelMes[]
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -466,4 +474,57 @@ model Notification {
   createdAt DateTime @default(now()) @map("created_at")
 
   @@map("notifications")
+}
+
+// --- NOTICIAS (CMS) ---
+model Noticia {
+  id        Int      @id @default(autoincrement())
+  title     String
+  slug      String?  @unique
+  excerpt   String?  @db.VarChar(280)
+  content   String   @db.Text
+  imageUrl  String?
+  published Boolean  @default(false)
+  status    ArticleStatus @default(BORRADOR)
+  publishedAt DateTime? @map("published_at")
+  
+  authorId  Int      @map("author_id")
+  author    User     @relation(fields: [authorId], references: [id])
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([published])
+  @@index([status])
+
+  @@map("noticias")
+}
+
+model LibroDelMes {
+  id            Int      @id @default(autoincrement())
+  titulo        String
+  descripcion   String?  @db.Text
+  autor         String?
+  categoria     String   @default("RECOMENDACION")
+  calificacion  Float?
+  resenas       Int?     @map("resenas")
+  portadaUrl    String?  @map("portada_url")
+  isbn          String?
+  googleVolumeId String? @map("google_volume_id")
+
+  activo        Boolean  @default(true)
+
+  bookId        Int?     @map("book_id")
+  book          Book?    @relation(fields: [bookId], references: [id])
+
+  createdById   Int?     @map("created_by_id")
+  createdBy     User?    @relation(fields: [createdById], references: [id])
+
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  @@index([activo])
+  @@index([categoria])
+  @@index([bookId])
+  @@map("libros_del_mes")
 }

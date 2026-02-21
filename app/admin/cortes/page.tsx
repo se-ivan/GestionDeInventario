@@ -84,6 +84,10 @@ export default function CortesHistoryPage() {
       return `$${Number(val).toFixed(2)}`
   }
 
+  function ion(arg0: (prev: any) => any) {
+    throw new Error("Function not implemented.")
+  }
+
   return (
     <div className="p-6 space-y-6 bg-slate-50 min-h-screen">
        <div className="flex justify-between items-center bg-white p-4 rounded-xl shadow-sm">
@@ -122,7 +126,7 @@ export default function CortesHistoryPage() {
                     value={selectedSucursal}
                   onChange={e => {
                    setSelectedSucursal(e.target.value)
-                   setPaginat ion(prev => ({ ...prev, page: 1 }))
+                   setPagination(prev => ({ ...prev, page: 1 }))
                   }}
                     className="h-9 w-40 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                 >

@@ -35,6 +35,8 @@ const ALL_PERMISSIONS = [
     { id: "PENDING_REMINDER", label: "Modal recordatorio de pendientes" },
   { id: "CASH_CUTS", label: "Cortes de Caja" },
   { id: "APARTADOS", label: "Sistema de Apartados" },
+  { id: "CMS", label: "Gestión de Noticias (CMS)" },
+    { id: "BOOK_OF_MONTH", label: "Gestión de Libros del Mes" },
 ];
 
 export function UserManagement({ initialUsers }: { initialUsers: User[] }) {
