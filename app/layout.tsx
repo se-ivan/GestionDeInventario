@@ -8,6 +8,11 @@ import { auth } from "@/auth"
 import "./globals.css"
 
 export const metadata: Metadata = {
+  title: "El Colegio Invisible - Inventario",
+  description: "Sistema de gestión de inventario",
+  icons: {
+    icon: "/favicon.svg",
+  },
   robots: {
     index: false,
     follow: false,

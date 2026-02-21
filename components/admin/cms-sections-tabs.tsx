@@ -2,11 +2,12 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Newspaper, Star } from "lucide-react";
+import { Mail, Newspaper, Star } from "lucide-react";
 
 const sections = [
   { href: "/cms/noticias", label: "Noticias", icon: Newspaper },
   { href: "/cms/libros-del-mes", label: "Libros del mes", icon: Star },
+  { href: "/cms/correos", label: "Correos", icon: Mail },
 ];
 
 export function CmsSectionsTabs() {

@@ -1,5 +1,6 @@
 "use client"
 
+import Image from "next/image"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import {
@@ -22,6 +23,7 @@ import {
   Newspaper,
   BookOpen,
   Star,
+  Mail,
 } from "lucide-react"
 import { logout } from "@/actions/logout"
 import { useSession } from "next-auth/react"
@@ -55,6 +57,7 @@ const menuGroups = [
       { href: "/admin", title: "Admin", icon: Shield, permission: "ADMIN" },
       { href: "/cms/noticias", title: "Noticias (CMS)", icon: Newspaper, permission: "CMS" },
       { href: "/cms/libros-del-mes", title: "Libros del Mes", icon: Star, permission: "BOOK_OF_MONTH" },
+      { href: "/cms/correos", title: "Correos", icon: Mail, permission: "EMAIL_CAMPAIGNS" },
       { href: "/perfil", title: "Perfil", icon: User, permission: "PROFILE" },
     ],
   },
@@ -85,7 +88,11 @@ export function SidebarNav() {
     setExpandedGroups((prev) => ({ ...prev, [group]: !prev[group] }))
   }
 
-  const canAccess = (permission: string) => isAdmin || permissions.includes(permission) || permission === "PROFILE"
+  const canAccess = (permission: string) => {
+    if (permission === "PROFILE") return true
+    if (permission === "EMAIL_CAMPAIGNS") return user?.role === "ADMIN" || user?.role === "VENDEDOR"
+    return isAdmin || permissions.includes(permission)
+  }
 
   const isRouteActive = (href: string) => {
     const linkPath = href.split("?")[0]
@@ -97,8 +104,8 @@ export function SidebarNav() {
     <div className="flex h-full flex-col rounded-3xl bg-white/95 p-3 shadow-[0_20px_45px_-30px_rgba(15,23,42,0.75)]">
       <div className="flex items-center justify-between px-3 py-2">
         <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-slate-100 text-slate-700">
-            <BookOpen className="h-5 w-5" />
+          <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-blue-50 text-blue-600">
+            <Image src="/favicon.svg" alt="Logo" width={24} height={24} className="h-6 w-6" style={{ filter: 'invert(35%) sepia(96%) saturate(3332%) hue-rotate(206deg) brightness(98%) contrast(92%)' }} />
           </div>
           <div>
             <p className="text-sm font-semibold text-slate-900">El Colegio Invisible</p>
@@ -138,11 +145,11 @@ export function SidebarNav() {
                         onClick={() => setIsOpen(false)}
                         className={`flex items-center gap-3 rounded-2xl px-3 py-2 text-sm transition ${
                           isActive
-                            ? "bg-slate-900/5 text-slate-900"
+                            ? "bg-blue-500 text-white shadow-sm"
                             : "text-slate-600 hover:bg-slate-100/70 hover:text-slate-900"
                         }`}
                       >
-                        <link.icon className={`h-4 w-4 ${isActive ? "text-slate-900" : "text-slate-400"}`} />
+                        <link.icon className={`h-4 w-4 ${isActive ? "text-white" : "text-slate-400"}`} />
                         <span className="font-medium">{link.title}</span>
                       </Link>
                     )
