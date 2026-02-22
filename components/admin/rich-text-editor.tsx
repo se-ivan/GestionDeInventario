@@ -1,6 +1,6 @@
 "use client";
 
-import { ChangeEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { ChangeEvent, useCallback, useEffect, useRef, useState } from "react";
 import { EditorContent, useEditor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Image from "@tiptap/extension-image";
@@ -26,6 +26,8 @@ import {
   List,
   ListOrdered,
   Loader2,
+  Minus,
+  Plus,
   Redo,
   Strikethrough,
   Underline as UnderlineIcon,
@@ -124,11 +126,6 @@ export function RichTextEditor({
     },
   });
 
-  const selectedImageWidth = useMemo(() => {
-    if (!editor?.isActive("image")) return 100;
-    return parseWidthPercent(editor.getAttributes("image").width);
-  }, [editor]);
-
   useEffect(() => {
     if (!editor) return;
     const updateImageWidth = () => {
@@ -166,6 +163,14 @@ export function RichTextEditor({
       editor.chain().focus().updateAttributes("image", { width: `${safe}%` }).run();
     },
     [editor],
+  );
+
+  const applyImageWidthStep = useCallback(
+    (delta: number) => {
+      const next = clampPercent((imageWidthPercent || 100) + delta);
+      applyImageWidth(next);
+    },
+    [applyImageWidth, imageWidthPercent],
   );
 
   const insertImageByUrl = useCallback(() => {
@@ -330,23 +335,40 @@ export function RichTextEditor({
         {editor.isActive("image") ? (
           <div className="mt-2 flex flex-wrap items-center gap-2 rounded-md border bg-background px-2 py-2">
             <span className="text-xs text-muted-foreground">Tamaño imagen</span>
+            <Button type="button" variant="outline" size="sm" className="h-8 px-2" onClick={() => applyImageWidthStep(-10)}>
+              <Minus className="h-3.5 w-3.5" />
+            </Button>
             <input
               type="range"
               min={1}
               max={300}
-              value={imageWidthPercent || selectedImageWidth}
+              value={imageWidthPercent}
               onChange={(event) => applyImageWidth(Number(event.target.value))}
               className="h-2 w-44 cursor-pointer"
             />
+            <Button type="button" variant="outline" size="sm" className="h-8 px-2" onClick={() => applyImageWidthStep(10)}>
+              <Plus className="h-3.5 w-3.5" />
+            </Button>
             <Input
               type="number"
               min={1}
               max={300}
-              value={imageWidthPercent || selectedImageWidth}
-              onChange={(event) => applyImageWidth(Number(event.target.value || 100))}
+              value={imageWidthPercent}
+              onChange={(event) => {
+                const rawValue = Number(event.target.value);
+                if (!Number.isFinite(rawValue)) return;
+                applyImageWidth(rawValue);
+              }}
               className="h-8 w-20"
             />
             <span className="text-sm">%</span>
+            <div className="ml-1 flex items-center gap-1">
+              {[50, 75, 100].map((preset) => (
+                <Button key={preset} type="button" variant="secondary" size="sm" className="h-7 px-2 text-xs" onClick={() => applyImageWidth(preset)}>
+                  {preset}%
+                </Button>
+              ))}
+            </div>
           </div>
         ) : null}
       </div>

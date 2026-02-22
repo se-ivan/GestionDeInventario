@@ -27,6 +27,13 @@ const canManageFeaturedBooks = (session: { user?: { role?: string; permissions?:
 
 const libroDelMesDelegate = (prisma as any).libroDelMes;
 
+const isMissingLibroDelMesTableError = (error: unknown) => {
+  if (!error || typeof error !== "object") return false;
+  const prismaError = error as { code?: string; meta?: { table?: string } };
+  const tableName = prismaError.meta?.table || "";
+  return prismaError.code === "P2021" && tableName.includes("libros_del_mes");
+};
+
 export async function getLibrosDelMes() {
   try {
     const session = await auth();
@@ -56,6 +63,12 @@ export async function getLibrosDelMes() {
     return { success: true, data };
   } catch (error) {
     console.error("Error fetching libros del mes:", error);
+    if (isMissingLibroDelMesTableError(error)) {
+      return {
+        success: false,
+        error: "Falta la tabla libros_del_mes en la base de datos. Ejecuta: pnpm db:execute:librosdelmes",
+      };
+    }
     return { success: false, error: "No se pudieron obtener los libros del mes" };
   }
 }
@@ -92,6 +105,12 @@ export async function createLibroDelMes(input: LibroDelMesInput) {
     return { success: true, data: created };
   } catch (error) {
     console.error("Error creating libro del mes:", error);
+    if (isMissingLibroDelMesTableError(error)) {
+      return {
+        success: false,
+        error: "Falta la tabla libros_del_mes en la base de datos. Ejecuta: pnpm db:execute:librosdelmes",
+      };
+    }
     return { success: false, error: "No se pudo crear el libro del mes" };
   }
 }
@@ -128,6 +147,12 @@ export async function updateLibroDelMes(id: number, input: LibroDelMesInput) {
     return { success: true, data: updated };
   } catch (error) {
     console.error("Error updating libro del mes:", error);
+    if (isMissingLibroDelMesTableError(error)) {
+      return {
+        success: false,
+        error: "Falta la tabla libros_del_mes en la base de datos. Ejecuta: pnpm db:execute:librosdelmes",
+      };
+    }
     return { success: false, error: "No se pudo actualizar el libro del mes" };
   }
 }
@@ -148,6 +173,12 @@ export async function toggleLibroDelMesActivo(id: number, activo: boolean) {
     return { success: true };
   } catch (error) {
     console.error("Error toggling libro del mes:", error);
+    if (isMissingLibroDelMesTableError(error)) {
+      return {
+        success: false,
+        error: "Falta la tabla libros_del_mes en la base de datos. Ejecuta: pnpm db:execute:librosdelmes",
+      };
+    }
     return { success: false, error: "No se pudo cambiar el estado" };
   }
 }
@@ -165,6 +196,12 @@ export async function deleteLibroDelMes(id: number) {
     return { success: true };
   } catch (error) {
     console.error("Error deleting libro del mes:", error);
+    if (isMissingLibroDelMesTableError(error)) {
+      return {
+        success: false,
+        error: "Falta la tabla libros_del_mes en la base de datos. Ejecuta: pnpm db:execute:librosdelmes",
+      };
+    }
     return { success: false, error: "No se pudo eliminar el registro" };
   }
 }

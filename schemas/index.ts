@@ -46,5 +46,26 @@ export const ClientSchema = z.object({
   grupo: z.string().optional(),
   turno: z.string().optional(),
   tipo: z.string().default("GENERAL"),
+}).superRefine((value, context) => {
+  const isStudent = value.tipo === "ESTUDIANTE";
+
+  if (isStudent && !value.matricula?.trim()) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["matricula"],
+      message: "La matrícula es obligatoria para estudiantes",
+    });
+  }
+
+  if (!isStudent) {
+    const hasAcademicData = [value.matricula, value.semestre, value.grupo, value.turno].some((field) => Boolean(field?.trim()));
+    if (hasAcademicData) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["tipo"],
+        message: "Los datos académicos solo aplican para tipo ESTUDIANTE",
+      });
+    }
+  }
 });
 

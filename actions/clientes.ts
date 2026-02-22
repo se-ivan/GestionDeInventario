@@ -5,6 +5,21 @@ import { ClientSchema } from "@/schemas";
 import * as z from "zod";
 import { revalidatePath } from "next/cache";
 
+function normalizeClienteData(values: z.infer<typeof ClientSchema>) {
+  const isStudent = values.tipo === "ESTUDIANTE";
+
+  return {
+    ...values,
+    email: values.email || null,
+    telefono: values.telefono || null,
+    direccion: values.direccion || null,
+    matricula: isStudent ? values.matricula?.trim() || null : null,
+    semestre: isStudent ? values.semestre?.trim() || null : null,
+    grupo: isStudent ? values.grupo?.trim() || null : null,
+    turno: isStudent ? values.turno?.trim() || null : null,
+  };
+}
+
 export async function getClientes() {
   try {
     const clientes = await db.cliente.findMany({
@@ -38,9 +53,10 @@ export async function createCliente(values: z.infer<typeof ClientSchema>) {
   const codigoBarras = `C${timestamp}${random}`; // C + 10 digits
 
   try {
+    const normalized = normalizeClienteData(validatedFields.data);
     await db.cliente.create({
       data: {
-        ...validatedFields.data,
+        ...normalized,
         codigoBarras,
         sku: codigoBarras, 
       }
@@ -98,10 +114,11 @@ export async function updateCliente(id: number, values: z.infer<typeof ClientSch
     }
   
     try {
+        const normalized = normalizeClienteData(validatedFields.data);
       await db.cliente.update({
         where: { id },
         data: {
-          ...validatedFields.data,
+            ...normalized,
         }
       });
       

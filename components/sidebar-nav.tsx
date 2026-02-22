@@ -94,10 +94,24 @@ export function SidebarNav() {
     return isAdmin || permissions.includes(permission)
   }
 
+  const visibleMenuItems = menuGroups.flatMap((group) => group.items.filter((item) => canAccess(item.permission)))
+
   const isRouteActive = (href: string) => {
+    const currentPath = pathname.split("?")[0]
     const linkPath = href.split("?")[0]
-    if (linkPath === "/") return pathname === "/"
-    return pathname === linkPath || pathname.startsWith(`${linkPath}/`)
+
+    if (linkPath === "/") return currentPath === "/"
+    if (currentPath === linkPath) return true
+    if (!currentPath.startsWith(`${linkPath}/`)) return false
+
+    const hasMoreSpecificMatch = visibleMenuItems.some((item) => {
+      const itemPath = item.href.split("?")[0]
+      if (itemPath === linkPath || itemPath === "/") return false
+      if (!itemPath.startsWith(`${linkPath}/`)) return false
+      return currentPath === itemPath || currentPath.startsWith(`${itemPath}/`)
+    })
+
+    return !hasMoreSpecificMatch
   }
 
   const NavContent = () => (
@@ -117,7 +131,7 @@ export function SidebarNav() {
         </Button>
       </div>
 
-      <div className="mt-3 flex-1 space-y-5 overflow-y-auto px-2 pb-2">
+      <div className="sidebar-nav-scroll mt-3 flex-1 space-y-5 overflow-y-auto px-2 pb-2">
         {menuGroups.map((group) => {
           const visibleItems = group.items.filter((item) => canAccess(item.permission))
           if (visibleItems.length === 0) return null
@@ -145,11 +159,11 @@ export function SidebarNav() {
                         onClick={() => setIsOpen(false)}
                         className={`flex items-center gap-3 rounded-2xl px-3 py-2 text-sm transition ${
                           isActive
-                            ? "bg-blue-500 text-white shadow-sm"
-                            : "text-slate-600 hover:bg-slate-100/70 hover:text-slate-900"
+                            ? "text-blue-600"
+                            : "text-slate-500 hover:bg-slate-100/70 hover:text-slate-800"
                         }`}
                       >
-                        <link.icon className={`h-4 w-4 ${isActive ? "text-white" : "text-slate-400"}`} />
+                        <link.icon className={`h-4 w-4 ${isActive ? "text-blue-500" : "text-slate-400"}`} />
                         <span className="font-medium">{link.title}</span>
                       </Link>
                     )

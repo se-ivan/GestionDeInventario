@@ -106,10 +106,22 @@ export async function POST(request: NextRequest) {
       successful.push({ email: recipient.email, id: responseData?.id });
     }
 
+    const sentCount = successful.length;
+    const failedCount = failed.length;
+    const total = recipients.length;
+    const success = failedCount === 0;
+
+    const message = success
+      ? `Se enviaron ${sentCount} de ${total} correos correctamente.`
+      : sentCount > 0
+        ? `Envío parcial: ${sentCount} enviados y ${failedCount} fallidos de ${total}.`
+        : `No se pudo enviar la campaña: ${failedCount} correos fallidos.`;
+
     return NextResponse.json({
-      success: failed.length === 0,
-      sentCount: successful.length,
-      failedCount: failed.length,
+      success,
+      message,
+      sentCount,
+      failedCount,
       failed,
     });
   } catch (error) {

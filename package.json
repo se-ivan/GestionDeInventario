@@ -6,7 +6,11 @@
     "build": "prisma generate &&next build",
     "dev": "next dev",
     "lint": "next lint",
-    "start": "next start"
+    "start": "next start",
+    "db:status": "prisma migrate status",
+    "db:deploy": "prisma migrate deploy",
+    "db:execute:librosdelmes": "prisma db execute --file prisma/manual/prod-hotfix-libros-del-mes.sql --schema prisma/schema.prisma",
+    "db:execute:emailtemplates": "prisma db execute --file prisma/manual/prod-hotfix-email-templates.sql --schema prisma/schema.prisma"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
@@ -74,6 +78,7 @@
     "react-barcode": "^1.6.1",
     "react-day-picker": "9.8.0",
     "react-dom": "19.2.4",
+    "react-email-editor": "^1.7.11",
     "react-hook-form": "^7.60.0",
     "react-resizable-panels": "^2.1.7",
     "recharts": "latest",

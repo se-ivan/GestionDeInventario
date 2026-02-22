@@ -52,6 +52,7 @@ model User {
   cajas      CorteCaja[]
   expenses   Expense[]
   noticias   Noticia[]
+  emailTemplates EmailTemplate[]
 
   createdAt DateTime @default(now()) @map("created_at")
 
@@ -527,4 +528,23 @@ model LibroDelMes {
   @@index([categoria])
   @@index([bookId])
   @@map("libros_del_mes")
+}
+
+model EmailTemplate {
+  id          Int      @id @default(autoincrement())
+  nombre      String
+  subject     String?  @db.VarChar(255)
+  html        String   @db.Text
+  design      Json?
+  activo      Boolean  @default(true)
+
+  createdById Int?     @map("created_by_id")
+  createdBy   User?    @relation(fields: [createdById], references: [id])
+
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@index([createdAt])
+  @@index([activo])
+  @@map("email_templates")
 }
