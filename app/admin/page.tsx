@@ -55,9 +55,9 @@ export default async function AdminPage() {
     ])
 
     return (
-        <div className="flex-1 space-y-4 p-8 pt-6">
+        <div className="flex-1 space-y-6 p-8 pt-6 bg-slate-50/30 min-h-screen">
             <div className="flex items-center justify-between space-y-2">
-                <h2 className="text-3xl font-bold tracking-tight">Panel de Administrador</h2>
+                <h2 className="text-3xl font-bold tracking-tight text-slate-900">Panel de Administrador</h2>
             </div>
 
             <AdminSectionsTabs

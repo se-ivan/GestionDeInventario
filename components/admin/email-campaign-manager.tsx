@@ -105,6 +105,7 @@ const defaultDesign = {
 
 const unlayerOptions: EmailEditorProps["options"] = {
   displayMode: "email",
+  locale: "es",
   mergeTags: {
     nombre_cliente: {
       name: "Nombre del cliente",
@@ -136,7 +137,7 @@ const unlayerOptions: EmailEditorProps["options"] = {
 export function EmailCampaignManager() {
   const editorRef = useRef<EditorRef>(null);
 
-  const [activeTab, setActiveTab] = useState<"design" | "send">("design");
+  const [activeTab, setActiveTab] = useState<"design" | "send">("send");
   const [clients, setClients] = useState<EmailClient[]>([]);
   const [templates, setTemplates] = useState<EmailTemplate[]>([]);
   const [isLoadingClients, setIsLoadingClients] = useState(true);
@@ -433,21 +434,21 @@ export function EmailCampaignManager() {
 
   return (
     <>
-      <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as "design" | "send")} className="space-y-4">
-      <TabsList className="w-full justify-start">
-        <TabsTrigger value="design">Diseñador de Plantillas</TabsTrigger>
-        <TabsTrigger value="send">Envío de Campañas</TabsTrigger>
+      <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as "design" | "send")} className="space-y-6">
+      <TabsList className="w-full justify-start rounded-none border-b border-slate-200/80 bg-transparent p-0 h-auto">
+        <TabsTrigger value="design" className="rounded-none px-6 py-3 text-sm font-medium text-slate-600 data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:text-blue-600 data-[state=active]:bg-transparent data-[state=active]:shadow-none transition-colors hover:text-slate-900">Diseñador de Plantillas</TabsTrigger>
+        <TabsTrigger value="send" className="rounded-none px-6 py-3 text-sm font-medium text-slate-600 data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:text-blue-600 data-[state=active]:bg-transparent data-[state=active]:shadow-none transition-colors hover:text-slate-900">Envío de Campañas</TabsTrigger>
       </TabsList>
 
-      <TabsContent value="design" className="space-y-4">
-        <Card>
-          <CardHeader className="space-y-3">
-            <CardTitle className="text-xl">Diseñador Unlayer (ventana completa)</CardTitle>
-            <div className="grid gap-3 lg:grid-cols-3">
+      <TabsContent value="design" className="space-y-6 mt-4">
+        <Card className="border-slate-200 shadow-sm bg-white overflow-hidden">
+          <CardHeader className="space-y-4 border-b border-slate-100 bg-slate-50/50 pb-6">
+            <CardTitle className="text-xl font-semibold text-slate-800">Diseñador Unlayer (ventana completa)</CardTitle>
+            <div className="grid gap-5 lg:grid-cols-3">
               <div className="grid gap-2">
-                <Label htmlFor="design-template-select">Plantilla</Label>
+                <Label htmlFor="design-template-select" className="text-slate-700">Plantilla</Label>
                 <Select value={designTemplateId} onValueChange={onChangeDesignTemplate}>
-                  <SelectTrigger id="design-template-select">
+                  <SelectTrigger id="design-template-select" className="bg-white">
                     <SelectValue placeholder={isLoadingTemplates ? "Cargando plantillas..." : "Selecciona plantilla"} />
                   </SelectTrigger>
                   <SelectContent>
@@ -462,109 +463,122 @@ export function EmailCampaignManager() {
               </div>
 
               <div className="grid gap-2">
-                <Label htmlFor="template-name">Nombre de plantilla</Label>
+                <Label htmlFor="template-name" className="text-slate-700">Nombre de plantilla</Label>
                 <Input
                   id="template-name"
                   value={templateName}
                   onChange={(event) => setTemplateName(event.target.value)}
                   placeholder="Ej: Bienvenida clientes"
+                  className="bg-white"
                 />
               </div>
 
               <div className="grid gap-2">
-                <Label htmlFor="design-subject">Asunto por defecto</Label>
+                <Label htmlFor="design-subject" className="text-slate-700">Asunto por defecto</Label>
                 <Input
                   id="design-subject"
                   value={designSubject}
                   onChange={(event) => setDesignSubject(event.target.value)}
                   placeholder="Asunto sugerido"
+                  className="bg-white"
                 />
               </div>
             </div>
-            <p className="text-xs text-muted-foreground">
-              Variables disponibles: {"{{nombre_cliente}}"}, {"{{email_cliente}}"}, {"{{telefono_cliente}}"}, {"{{tipo_cliente}}"}
+            <p className="text-xs text-slate-500 bg-slate-100/50 p-2 rounded-md border border-slate-200/60">
+              <span className="font-medium text-slate-700">Variables disponibles:</span> {"{{nombre_cliente}}"}, {"{{email_cliente}}"}, {"{{telefono_cliente}}"}, {"{{tipo_cliente}}"}
             </p>
           </CardHeader>
 
-          <CardContent className="space-y-4">
-            <div className="overflow-hidden rounded-md border bg-background">
+          <CardContent className="space-y-6 p-6">
+            <div className="overflow-hidden rounded-lg border border-slate-200 bg-slate-50 shadow-inner">
               <EmailEditor ref={editorRef} onReady={onEditorReady} minHeight="72vh" options={unlayerOptions} />
             </div>
 
-            <div className="flex flex-wrap gap-2">
-              <Button type="button" variant="outline" onClick={refreshDesignPreview}>
+            <div className="flex flex-wrap gap-3 pt-2">
+              <Button type="button" variant="outline" onClick={refreshDesignPreview} className="border-slate-200 text-slate-700 hover:bg-slate-50">
                 Vista previa rápida
               </Button>
-              <Button type="button" variant="secondary" onClick={saveTemplateFromDesigner} disabled={isSavingTemplate}>
+              <Button type="button" onClick={saveTemplateFromDesigner} disabled={isSavingTemplate} className="bg-blue-600 hover:bg-blue-700 text-white shadow-sm">
                 {isSavingTemplate ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
                 Guardar plantilla
               </Button>
             </div>
 
-            <details className="rounded-md border bg-muted/10 px-3 py-2 text-sm">
-              <summary className="cursor-pointer font-medium">Vista previa del diseño actual</summary>
-              <div className="mt-3 overflow-hidden rounded-md border bg-white">
-                <iframe title="Vista previa diseño" srcDoc={sendPreviewHtml} className="h-[420px] w-full" sandbox="" />
+            <details className="rounded-lg border border-slate-200 bg-slate-50/50 overflow-hidden group">
+              <summary className="cursor-pointer font-medium text-slate-700 px-4 py-3 hover:bg-slate-100/50 transition-colors select-none">Vista previa del diseño actual</summary>
+              <div className="p-4 border-t border-slate-200">
+                <div className="overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm">
+                  <iframe title="Vista previa diseño" srcDoc={sendPreviewHtml} className="h-[420px] w-full" sandbox="" />
+                </div>
               </div>
             </details>
           </CardContent>
         </Card>
       </TabsContent>
 
-      <TabsContent value="send" className="space-y-4">
-        <div className="grid gap-4 xl:grid-cols-2">
-          <Card className="xl:sticky xl:top-6 xl:h-[calc(100vh-7rem)]">
-            <CardHeader className="space-y-3">
-              <CardTitle className="flex items-center gap-2 text-xl">
-                <Mail className="h-5 w-5" />
+      <TabsContent value="send" className="space-y-6 mt-4">
+        <div className="grid gap-6 xl:grid-cols-2">
+          <Card className="xl:sticky xl:top-6 xl:h-[calc(100vh-7rem)] border-slate-200 shadow-sm bg-white overflow-hidden flex flex-col">
+            <CardHeader className="space-y-4 border-b border-slate-100 bg-slate-50/50 pb-5 shrink-0">
+              <CardTitle className="flex items-center gap-2 text-xl font-semibold text-slate-800">
+                <Mail className="h-5 w-5 text-blue-600" />
                 Destinatarios
               </CardTitle>
               <div className="relative">
-                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                 <Input
                   value={searchTerm}
                   onChange={(event) => setSearchTerm(event.target.value)}
                   placeholder="Buscar por nombre, email o tipo"
-                  className="pl-9"
+                  className="pl-9 bg-white border-slate-200 focus:border-blue-500 focus:ring-blue-500/20"
                 />
               </div>
-              <div className="flex items-center justify-between text-sm text-muted-foreground">
-                <label className="flex items-center gap-2">
-                  <Checkbox checked={allFilteredSelected} onCheckedChange={(checked) => toggleSelectAllFiltered(Boolean(checked))} />
-                  Seleccionar todos
+              <div className="flex items-center justify-between text-sm text-slate-600 bg-white p-2 rounded-md border border-slate-200/60">
+                <label className="flex items-center gap-2 cursor-pointer hover:text-slate-900 transition-colors">
+                  <Checkbox checked={allFilteredSelected} onCheckedChange={(checked) => toggleSelectAllFiltered(Boolean(checked))} className="data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600" />
+                  <span className="font-medium">Seleccionar todos</span>
                 </label>
-                <span>{selectedIds.length} seleccionados</span>
+                <span className="font-medium bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full text-xs">{selectedIds.length} seleccionados</span>
               </div>
             </CardHeader>
-            <CardContent className="max-h-[60vh] overflow-auto">
+            <CardContent className="p-0 overflow-auto flex-1">
               {isLoadingClients ? (
-                <div className="flex items-center justify-center py-10">
-                  <Loader2 className="h-6 w-6 animate-spin" />
+                <div className="flex flex-col items-center justify-center py-16 text-slate-500 gap-3">
+                  <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+                  <p>Cargando destinatarios...</p>
                 </div>
               ) : (
                 <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-10">Sel</TableHead>
-                      <TableHead>Nombre</TableHead>
-                      <TableHead>Email</TableHead>
-                      <TableHead>Tipo</TableHead>
+                  <TableHeader className="bg-slate-50/80 sticky top-0 z-10 shadow-sm">
+                    <TableRow className="hover:bg-transparent border-slate-100">
+                      <TableHead className="w-12 text-center font-semibold text-slate-600">Sel</TableHead>
+                      <TableHead className="font-semibold text-slate-600">Nombre</TableHead>
+                      <TableHead className="font-semibold text-slate-600">Email</TableHead>
+                      <TableHead className="font-semibold text-slate-600">Tipo</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {filteredClients.map((client) => (
-                      <TableRow key={client.id}>
-                        <TableCell>
-                          <Checkbox checked={selectedIds.includes(client.id)} onCheckedChange={(checked) => toggleOne(client.id, Boolean(checked))} />
+                      <TableRow key={client.id} className="border-slate-100 hover:bg-slate-50/80 transition-colors cursor-pointer" onClick={() => toggleOne(client.id, !selectedIds.includes(client.id))}>
+                        <TableCell className="text-center" onClick={(e) => e.stopPropagation()}>
+                          <Checkbox checked={selectedIds.includes(client.id)} onCheckedChange={(checked) => toggleOne(client.id, Boolean(checked))} className="data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600" />
                         </TableCell>
-                        <TableCell>{client.nombre}</TableCell>
-                        <TableCell className="max-w-[220px] truncate">{client.email}</TableCell>
-                        <TableCell>{client.tipo || "-"}</TableCell>
+                        <TableCell className="font-medium text-slate-900">{client.nombre}</TableCell>
+                        <TableCell className="max-w-[220px] truncate text-slate-500">{client.email}</TableCell>
+                        <TableCell>
+                          {client.tipo ? (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-slate-100 text-slate-700 border border-slate-200">
+                              {client.tipo}
+                            </span>
+                          ) : (
+                            <span className="text-slate-400">-</span>
+                          )}
+                        </TableCell>
                       </TableRow>
                     ))}
                     {filteredClients.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={4} className="text-center text-muted-foreground">
+                        <TableCell colSpan={4} className="text-center py-12 text-slate-500">
                           No hay clientes que coincidan con la búsqueda
                         </TableCell>
                       </TableRow>
@@ -575,14 +589,14 @@ export function EmailCampaignManager() {
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader className="space-y-3">
-              <CardTitle className="text-xl">Seleccionar plantilla guardada</CardTitle>
-              <div className="grid gap-3 lg:grid-cols-2">
+          <Card className="border-slate-200 shadow-sm bg-white overflow-hidden flex flex-col">
+            <CardHeader className="space-y-4 border-b border-slate-100 bg-slate-50/50 pb-5 shrink-0">
+              <CardTitle className="text-xl font-semibold text-slate-800">Seleccionar plantilla guardada</CardTitle>
+              <div className="grid gap-4 lg:grid-cols-2">
                 <div className="grid gap-2">
-                  <Label htmlFor="send-template-select">Plantilla</Label>
+                  <Label htmlFor="send-template-select" className="text-slate-700">Plantilla</Label>
                   <Select value={sendTemplateId} onValueChange={onChangeSendTemplate}>
-                    <SelectTrigger id="send-template-select">
+                    <SelectTrigger id="send-template-select" className="bg-white">
                       <SelectValue placeholder={isLoadingTemplates ? "Cargando plantillas..." : "Selecciona plantilla guardada"} />
                     </SelectTrigger>
                     <SelectContent>
@@ -595,25 +609,26 @@ export function EmailCampaignManager() {
                   </Select>
                 </div>
                 <div className="grid gap-2">
-                  <Label htmlFor="send-subject">Asunto</Label>
+                  <Label htmlFor="send-subject" className="text-slate-700">Asunto</Label>
                   <Input
                     id="send-subject"
                     value={sendSubject}
                     onChange={(event) => setSendSubject(event.target.value)}
                     placeholder="Asunto del correo"
+                    className="bg-white"
                   />
                 </div>
               </div>
             </CardHeader>
 
-            <CardContent className="space-y-4">
-              <div className="overflow-hidden rounded-md border bg-white">
-                <iframe title="Vista previa plantilla seleccionada" srcDoc={sendPreviewHtml} className="h-[500px] w-full" sandbox="" />
+            <CardContent className="space-y-6 p-6 flex-1 flex flex-col">
+              <div className="overflow-hidden rounded-lg border border-slate-200 bg-slate-50 shadow-inner flex-1 min-h-[400px]">
+                <iframe title="Vista previa plantilla seleccionada" srcDoc={sendPreviewHtml} className="h-full w-full min-h-[400px]" sandbox="" />
               </div>
 
-              <Button onClick={sendCampaign} disabled={isSending || isLoadingClients || isLoadingTemplates} className="w-full">
-                {isSending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Mail className="mr-2 h-4 w-4" />}
-                Enviar campaña
+              <Button onClick={sendCampaign} disabled={isSending || isLoadingClients || isLoadingTemplates} className="w-full py-6 text-lg font-medium bg-blue-600 hover:bg-blue-700 text-white shadow-md hover:shadow-lg transition-all">
+                {isSending ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <Mail className="mr-2 h-5 w-5" />}
+                Enviar campaña a {selectedIds.length} destinatarios
               </Button>
             </CardContent>
           </Card>

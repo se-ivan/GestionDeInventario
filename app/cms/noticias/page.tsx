@@ -13,7 +13,7 @@ export default async function CmsNoticiasPage() {
   }
 
   return (
-    <div className="flex-1 p-8 pt-6">
+    <div className="flex-1 p-8 pt-6 bg-slate-50/30 min-h-screen">
       <CmsSectionsTabs />
       <NoticiasManager />
     </div>

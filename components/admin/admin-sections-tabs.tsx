@@ -40,39 +40,39 @@ export function AdminSectionsTabs({
   const selectedSellerData = useMemo(() => sellerPerformanceByRange[sellerRange], [sellerPerformanceByRange, sellerRange])
 
   return (
-    <Tabs defaultValue="finanzas" className="space-y-4">
-      <TabsList variant="line" className="w-full justify-start rounded-none border-b border-slate-200/80 bg-transparent p-0">
-        <TabsTrigger value="finanzas" className="rounded-none px-4 py-2 text-slate-600 data-[state=active]:border-b-2  data-[state=active]:text-blue-600">
+    <Tabs defaultValue="finanzas" className="space-y-6">
+      <TabsList className="w-full justify-start rounded-none border-b border-slate-200/80 bg-transparent p-0 h-auto">
+        <TabsTrigger value="finanzas" className="rounded-none px-6 py-3 text-sm font-medium text-slate-600 data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:text-blue-600 data-[state=active]:bg-transparent data-[state=active]:shadow-none transition-colors hover:text-slate-900">
           Reportes financieros
         </TabsTrigger>
-        <TabsTrigger value="vendedores" className="rounded-none px-4 py-2 text-slate-600 data-[state=active]:border-b-2  data-[state=active]:text-blue-600">
+        <TabsTrigger value="vendedores" className="rounded-none px-6 py-3 text-sm font-medium text-slate-600 data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:text-blue-600 data-[state=active]:bg-transparent data-[state=active]:shadow-none transition-colors hover:text-slate-900">
           Rendimiento vendedores
         </TabsTrigger>
-        <TabsTrigger value="usuarios" className="rounded-none px-4 py-2 text-slate-600 data-[state=active]:border-b-2 data-[state=active]:text-blue-600">
+        <TabsTrigger value="usuarios" className="rounded-none px-6 py-3 text-sm font-medium text-slate-600 data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:text-blue-600 data-[state=active]:bg-transparent data-[state=active]:shadow-none transition-colors hover:text-slate-900">
           Gestión de usuarios
         </TabsTrigger>
       </TabsList>
 
-      <TabsContent value="finanzas" className="space-y-3">
-        <div>
-          <h3 className="text-xl font-semibold tracking-tight">Reportes financieros</h3>
-          <p className="text-sm text-muted-foreground">Análisis general de ventas, gastos y operaciones.</p>
+      <TabsContent value="finanzas" className="space-y-6 mt-6">
+        <div className="flex flex-col gap-1">
+          <h3 className="text-2xl font-semibold tracking-tight text-slate-900">Reportes financieros</h3>
+          <p className="text-sm text-slate-500">Análisis general de ventas, gastos y operaciones.</p>
         </div>
         <FinancialReports initialData={initialFinancialData} initialFilters={initialFilters} />
       </TabsContent>
 
-      <TabsContent value="vendedores" className="space-y-3">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-          <h3 className="text-xl font-semibold tracking-tight">Rendimiento de vendedores</h3>
-          <p className="text-sm text-muted-foreground">Clasificación por ventas, ingresos, gastos y utilidad neta.</p>
+      <TabsContent value="vendedores" className="space-y-6 mt-6">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+          <div className="flex flex-col gap-1">
+            <h3 className="text-2xl font-semibold tracking-tight text-slate-900">Rendimiento de vendedores</h3>
+            <p className="text-sm text-slate-500">Clasificación por ventas, ingresos, gastos y utilidad neta.</p>
           </div>
-          <div className="flex items-center gap-2 rounded-lg bg-slate-100/80 p-1">
+          <div className="flex items-center gap-1 rounded-lg bg-slate-100/80 p-1 border border-slate-200/60">
             <Button
               size="sm"
               variant={sellerRange === "7d" ? "default" : "ghost"}
               onClick={() => setSellerRange("7d")}
-              className={sellerRange === "7d" ? "bg-white text-slate-800 shadow-sm hover:bg-white" : "text-slate-600 hover:bg-white/70"}
+              className={sellerRange === "7d" ? "bg-white text-slate-800 shadow-sm hover:bg-white" : "text-slate-600 hover:bg-slate-200/50 hover:text-slate-900"}
             >
               7 días
             </Button>
@@ -80,7 +80,7 @@ export function AdminSectionsTabs({
               size="sm"
               variant={sellerRange === "30d" ? "default" : "ghost"}
               onClick={() => setSellerRange("30d")}
-              className={sellerRange === "30d" ? "bg-white text-slate-800 shadow-sm hover:bg-white" : "text-slate-600 hover:bg-white/70"}
+              className={sellerRange === "30d" ? "bg-white text-slate-800 shadow-sm hover:bg-white" : "text-slate-600 hover:bg-slate-200/50 hover:text-slate-900"}
             >
               30 días
             </Button>
@@ -88,7 +88,7 @@ export function AdminSectionsTabs({
               size="sm"
               variant={sellerRange === "90d" ? "default" : "ghost"}
               onClick={() => setSellerRange("90d")}
-              className={sellerRange === "90d" ? "bg-white text-slate-800 shadow-sm hover:bg-white" : "text-slate-600 hover:bg-white/70"}
+              className={sellerRange === "90d" ? "bg-white text-slate-800 shadow-sm hover:bg-white" : "text-slate-600 hover:bg-slate-200/50 hover:text-slate-900"}
             >
               90 días
             </Button>
@@ -97,7 +97,7 @@ export function AdminSectionsTabs({
         <SellerPerformance data={selectedSellerData} />
       </TabsContent>
 
-      <TabsContent value="usuarios" className="space-y-3">
+      <TabsContent value="usuarios" className="space-y-6 mt-6">
         <div>
           <h3 className="text-xl font-semibold tracking-tight">Gestión de usuarios</h3>
           <p className="text-sm text-muted-foreground">Administración de roles, permisos y acceso del sistema.</p>

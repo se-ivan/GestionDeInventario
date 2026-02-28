@@ -41,18 +41,18 @@ export function AdminChart({ title, data: initialData, color = "#2563eb", type }
   }
 
   return (
-    <Card className="col-span-1 border-0 shadow-md">
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+    <Card className="col-span-1 border-slate-200 shadow-sm bg-white overflow-hidden">
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4 border-b border-slate-100 bg-slate-50/50">
         <div className="space-y-1">
-          <CardTitle className="text-base font-bold">{title}</CardTitle>
-          <CardDescription>
+          <CardTitle className="text-lg font-semibold text-slate-800">{title}</CardTitle>
+          <CardDescription className="text-slate-500 font-medium">
              {range === '7d' ? 'Últimos 7 días' : range === '30d' ? 'Últimos 30 días' : 'Últimos 90 días'}
           </CardDescription>
         </div>
         <div className="flex gap-2">
            {type === 'expenses' && (
                <Select value={category} onValueChange={(val) => { setCategory(val); handleFilterChange(range, val); }}>
-                    <SelectTrigger className="w-[120px] h-8 text-xs bg-card">
+                    <SelectTrigger className="w-[120px] h-9 text-sm bg-white border-slate-200 text-slate-700 focus:ring-blue-500">
                         <SelectValue placeholder="Categoría" />
                     </SelectTrigger>
                     <SelectContent>
@@ -65,7 +65,7 @@ export function AdminChart({ title, data: initialData, color = "#2563eb", type }
                </Select>
            )}
            <Select value={range} onValueChange={(val) => { setRange(val); handleFilterChange(val, category); }}>
-                <SelectTrigger className="w-[110px] h-8 text-xs bg-card">
+                <SelectTrigger className="w-[110px] h-9 text-sm bg-white border-slate-200 text-slate-700 focus:ring-blue-500">
                     <SelectValue placeholder="Rango" />
                 </SelectTrigger>
                 <SelectContent>
@@ -76,36 +76,36 @@ export function AdminChart({ title, data: initialData, color = "#2563eb", type }
            </Select>
         </div>
       </CardHeader>
-      <CardContent className="pl-2 pt-4">
-        <div className={`h-[200px] w-full transition-opacity duration-200 ${isLoading ? 'opacity-50' : 'opacity-100'}`}>
+      <CardContent className="pl-2 pt-6 pb-6 pr-6">
+        <div className={`h-[240px] w-full transition-opacity duration-200 ${isLoading ? 'opacity-50' : 'opacity-100'}`}>
           <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={data}>
-              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
+            <LineChart data={data} margin={{ top: 5, right: 10, left: 10, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
               <XAxis 
                 dataKey="date" 
-                stroke="#9CA3AF" 
+                stroke="#64748b" 
                 fontSize={12} 
                 tickLine={false} 
                 axisLine={false}
                 minTickGap={30}
               />
               <YAxis
-                stroke="#9CA3AF"
+                stroke="#64748b"
                 fontSize={12}
                 tickLine={false}
                 axisLine={false}
                 tickFormatter={(value) => `$${value}`}
               />
               <Tooltip 
-                contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
+                contentStyle={{ borderRadius: '8px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
                 formatter={(value: number) => [`$${value}`, type === 'sales' ? 'Ventas' : 'Gastos']}
               />
               <Line 
                 type="monotone" 
                 dataKey="value" 
-                stroke={color} 
+                stroke={type === 'sales' ? '#2563eb' : '#f43f5e'} 
                 strokeWidth={3} 
-                dot={false}
+                dot={{ r: 4, fill: type === 'sales' ? '#2563eb' : '#f43f5e', strokeWidth: 0 }}
                 activeDot={{ r: 6, strokeWidth: 0 }}
               />
             </LineChart>

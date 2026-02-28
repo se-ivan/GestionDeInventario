@@ -63,12 +63,12 @@ export function UserManagement({ initialUsers }: { initialUsers: User[] }) {
   };
 
   return (
-    <Card className="border-0 shadow-md bg-card">
-      <CardHeader className="flex flex-row items-center justify-between pb-2">
-        <CardTitle className="text-xl font-bold">Gestión de Usuarios</CardTitle>
+    <Card className="border-slate-200 shadow-sm bg-white overflow-hidden">
+      <CardHeader className="flex flex-row items-center justify-between border-b border-slate-100 bg-slate-50/50 pb-4">
+        <CardTitle className="text-lg font-semibold text-slate-800">Gestión de Usuarios</CardTitle>
         <Dialog open={isAdding} onOpenChange={setIsAdding}>
             <DialogTrigger asChild>
-                <Button size="sm">
+                <Button size="sm" className="bg-blue-600 hover:bg-blue-700 text-white shadow-sm">
                     <Plus className="h-4 w-4 mr-2" />
                     Nuevo Usuario
                 </Button>
@@ -76,47 +76,47 @@ export function UserManagement({ initialUsers }: { initialUsers: User[] }) {
             <CreateUserDialog onAdd={handleAdd} onCancel={() => setIsAdding(false)} />
         </Dialog>
       </CardHeader>
-      <CardContent>
+      <CardContent className="p-0">
         <div className="relative w-full overflow-auto">
           <table className="w-full text-sm caption-bottom">
-            <thead className="[&_tr]:border-b">
-              <tr className="border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted">
-                <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Nombre</th>
-                <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Email</th>
-                <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Rol</th>
-                <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Permisos</th>
-                <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Acciones</th>
+            <thead className="[&_tr]:border-b bg-slate-50/80">
+              <tr className="border-slate-100 transition-colors hover:bg-transparent">
+                <th className="h-12 px-4 text-left align-middle font-semibold text-slate-600">Nombre</th>
+                <th className="h-12 px-4 text-left align-middle font-semibold text-slate-600">Email</th>
+                <th className="h-12 px-4 text-left align-middle font-semibold text-slate-600">Rol</th>
+                <th className="h-12 px-4 text-left align-middle font-semibold text-slate-600">Permisos</th>
+                <th className="h-12 px-4 text-left align-middle font-semibold text-slate-600">Acciones</th>
               </tr>
             </thead>
             <tbody className="[&_tr:last-child]:border-0">
               {users.map((user) => (
-                <tr key={user.id} className="border-b transition-colors hover:bg-muted/50">
-                  <td className="p-4 align-middle font-medium">{user.nombre}</td>
-                  <td className="p-4 align-middle text-muted-foreground">{user.email}</td>
+                <tr key={user.id} className="border-slate-100 transition-colors hover:bg-slate-50/50">
+                  <td className="p-4 align-middle font-medium text-slate-900">{user.nombre}</td>
+                  <td className="p-4 align-middle text-slate-500">{user.email}</td>
                   <td className="p-4 align-middle">
-                    <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold ${
-                      user.rol === 'ADMIN' ? 'bg-purple-100 text-purple-700' : 
-                      user.rol === 'VENDEDOR' ? 'bg-blue-100 text-blue-700' : 
-                      'bg-green-100 text-green-700'
+                    <span className={`px-2.5 py-1 rounded-md text-xs font-medium ${
+                      user.rol === 'ADMIN' ? 'bg-purple-100 text-purple-700 border border-purple-200' : 
+                      user.rol === 'VENDEDOR' ? 'bg-blue-100 text-blue-700 border border-blue-200' : 
+                      'bg-emerald-100 text-emerald-700 border border-emerald-200'
                     }`}>
                       {user.rol}
                     </span>
                   </td>
                   <td className="p-4 align-middle">
                       {user.rol === 'ADMIN' ? (
-                          <span className="text-xs text-muted-foreground italic">Acceso Total</span>
+                          <span className="text-xs text-slate-500 italic font-medium">Acceso Total</span>
                       ) : (
-                          <div className="flex flex-wrap gap-1">
+                          <div className="flex flex-wrap gap-1.5">
                               {user.permissions.length > 0 ? user.permissions.map(p => (
-                                  <span key={p} className="bg-secondary px-1.5 py-0.5 rounded text-[10px] font-medium text-secondary-foreground">{p}</span>
-                              )) : <span className="text-muted-foreground italic text-xs">Sin acceso</span>}
+                                  <span key={p} className="bg-slate-100 border border-slate-200 px-2 py-0.5 rounded-md text-[11px] font-medium text-slate-700 shadow-sm">{p}</span>
+                              )) : <span className="text-slate-400 italic text-xs">Sin acceso</span>}
                           </div>
                       )}
                   </td>
                   <td className="p-4 align-middle">
                     <Dialog open={editingUser?.id === user.id} onOpenChange={(open) => !open && setEditingUser(null)}>
                       <DialogTrigger asChild>
-                        <Button variant="ghost" size="sm" onClick={() => setEditingUser(user)}>
+                        <Button variant="ghost" size="sm" onClick={() => setEditingUser(user)} className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 font-medium">
                           Editar
                         </Button>
                       </DialogTrigger>

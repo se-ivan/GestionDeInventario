@@ -16,7 +16,7 @@ export default async function CmsLibrosDelMesPage() {
   }
 
   return (
-    <div className="flex-1 p-8 pt-6">
+    <div className="flex-1 p-8 pt-6 bg-slate-50/30 min-h-screen">
       <CmsSectionsTabs />
       <LibrosDelMesManager />
     </div>

@@ -231,79 +231,79 @@ export function RichTextEditor({
   if (!editor) return null;
 
   return (
-    <div className="w-full overflow-hidden rounded-md border bg-background">
-      <div className="sticky top-0 z-20 border-b bg-muted/80 p-2 backdrop-blur supports-[backdrop-filter]:bg-muted/65">
+    <div className="w-full overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
+      <div className="sticky top-0 z-20 border-b border-slate-100 bg-slate-50/80 p-2 backdrop-blur supports-[backdrop-filter]:bg-slate-50/65">
         <div className="flex flex-wrap items-center gap-1">
-          <Button type="button" variant="ghost" size="sm" onClick={() => editor.chain().focus().toggleBold().run()} className={editor.isActive("bold") ? "bg-muted" : ""}>
+          <Button type="button" variant="ghost" size="sm" onClick={() => editor.chain().focus().toggleBold().run()} className={`h-8 w-8 p-0 ${editor.isActive("bold") ? "bg-slate-200 text-slate-900" : "text-slate-600 hover:bg-slate-200/50 hover:text-slate-900"}`}>
             <Bold className="h-4 w-4" />
           </Button>
-          <Button type="button" variant="ghost" size="sm" onClick={() => editor.chain().focus().toggleItalic().run()} className={editor.isActive("italic") ? "bg-muted" : ""}>
+          <Button type="button" variant="ghost" size="sm" onClick={() => editor.chain().focus().toggleItalic().run()} className={`h-8 w-8 p-0 ${editor.isActive("italic") ? "bg-slate-200 text-slate-900" : "text-slate-600 hover:bg-slate-200/50 hover:text-slate-900"}`}>
             <Italic className="h-4 w-4" />
           </Button>
-          <Button type="button" variant="ghost" size="sm" onClick={() => editor.chain().focus().toggleUnderline().run()} className={editor.isActive("underline") ? "bg-muted" : ""}>
+          <Button type="button" variant="ghost" size="sm" onClick={() => editor.chain().focus().toggleUnderline().run()} className={`h-8 w-8 p-0 ${editor.isActive("underline") ? "bg-slate-200 text-slate-900" : "text-slate-600 hover:bg-slate-200/50 hover:text-slate-900"}`}>
             <UnderlineIcon className="h-4 w-4" />
           </Button>
-          <Button type="button" variant="ghost" size="sm" onClick={() => editor.chain().focus().toggleStrike().run()} className={editor.isActive("strike") ? "bg-muted" : ""}>
+          <Button type="button" variant="ghost" size="sm" onClick={() => editor.chain().focus().toggleStrike().run()} className={`h-8 w-8 p-0 ${editor.isActive("strike") ? "bg-slate-200 text-slate-900" : "text-slate-600 hover:bg-slate-200/50 hover:text-slate-900"}`}>
             <Strikethrough className="h-4 w-4" />
           </Button>
 
-          <div className="mx-1 h-6 w-px bg-border" />
+          <div className="mx-1 h-6 w-px bg-slate-200" />
 
-          <Button type="button" variant="ghost" size="sm" onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()} className={editor.isActive("heading", { level: 1 }) ? "bg-muted" : ""}>
+          <Button type="button" variant="ghost" size="sm" onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()} className={`h-8 w-8 p-0 ${editor.isActive("heading", { level: 1 }) ? "bg-slate-200 text-slate-900" : "text-slate-600 hover:bg-slate-200/50 hover:text-slate-900"}`}>
             <Heading1 className="h-4 w-4" />
           </Button>
-          <Button type="button" variant="ghost" size="sm" onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()} className={editor.isActive("heading", { level: 2 }) ? "bg-muted" : ""}>
+          <Button type="button" variant="ghost" size="sm" onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()} className={`h-8 w-8 p-0 ${editor.isActive("heading", { level: 2 }) ? "bg-slate-200 text-slate-900" : "text-slate-600 hover:bg-slate-200/50 hover:text-slate-900"}`}>
             <Heading2 className="h-4 w-4" />
           </Button>
-          <Button type="button" variant="ghost" size="sm" onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()} className={editor.isActive("heading", { level: 3 }) ? "bg-muted" : ""}>
+          <Button type="button" variant="ghost" size="sm" onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()} className={`h-8 w-8 p-0 ${editor.isActive("heading", { level: 3 }) ? "bg-slate-200 text-slate-900" : "text-slate-600 hover:bg-slate-200/50 hover:text-slate-900"}`}>
             <Heading3 className="h-4 w-4" />
           </Button>
 
-          <div className="mx-1 h-6 w-px bg-border" />
+          <div className="mx-1 h-6 w-px bg-slate-200" />
 
-          <Button type="button" variant="ghost" size="sm" onClick={() => editor.chain().focus().toggleBulletList().run()} className={editor.isActive("bulletList") ? "bg-muted" : ""}>
+          <Button type="button" variant="ghost" size="sm" onClick={() => editor.chain().focus().toggleBulletList().run()} className={`h-8 w-8 p-0 ${editor.isActive("bulletList") ? "bg-slate-200 text-slate-900" : "text-slate-600 hover:bg-slate-200/50 hover:text-slate-900"}`}>
             <List className="h-4 w-4" />
           </Button>
-          <Button type="button" variant="ghost" size="sm" onClick={() => editor.chain().focus().toggleOrderedList().run()} className={editor.isActive("orderedList") ? "bg-muted" : ""}>
+          <Button type="button" variant="ghost" size="sm" onClick={() => editor.chain().focus().toggleOrderedList().run()} className={`h-8 w-8 p-0 ${editor.isActive("orderedList") ? "bg-slate-200 text-slate-900" : "text-slate-600 hover:bg-slate-200/50 hover:text-slate-900"}`}>
             <ListOrdered className="h-4 w-4" />
           </Button>
 
-          <div className="mx-1 h-6 w-px bg-border" />
+          <div className="mx-1 h-6 w-px bg-slate-200" />
 
-          <Button type="button" variant="ghost" size="sm" onClick={() => editor.chain().focus().setTextAlign("left").run()} className={editor.isActive({ textAlign: "left" }) ? "bg-muted" : ""}>
+          <Button type="button" variant="ghost" size="sm" onClick={() => editor.chain().focus().setTextAlign("left").run()} className={`h-8 w-8 p-0 ${editor.isActive({ textAlign: "left" }) ? "bg-slate-200 text-slate-900" : "text-slate-600 hover:bg-slate-200/50 hover:text-slate-900"}`}>
             <AlignLeft className="h-4 w-4" />
           </Button>
-          <Button type="button" variant="ghost" size="sm" onClick={() => editor.chain().focus().setTextAlign("center").run()} className={editor.isActive({ textAlign: "center" }) ? "bg-muted" : ""}>
+          <Button type="button" variant="ghost" size="sm" onClick={() => editor.chain().focus().setTextAlign("center").run()} className={`h-8 w-8 p-0 ${editor.isActive({ textAlign: "center" }) ? "bg-slate-200 text-slate-900" : "text-slate-600 hover:bg-slate-200/50 hover:text-slate-900"}`}>
             <AlignCenter className="h-4 w-4" />
           </Button>
-          <Button type="button" variant="ghost" size="sm" onClick={() => editor.chain().focus().setTextAlign("right").run()} className={editor.isActive({ textAlign: "right" }) ? "bg-muted" : ""}>
+          <Button type="button" variant="ghost" size="sm" onClick={() => editor.chain().focus().setTextAlign("right").run()} className={`h-8 w-8 p-0 ${editor.isActive({ textAlign: "right" }) ? "bg-slate-200 text-slate-900" : "text-slate-600 hover:bg-slate-200/50 hover:text-slate-900"}`}>
             <AlignRight className="h-4 w-4" />
           </Button>
-          <Button type="button" variant="ghost" size="sm" onClick={() => editor.chain().focus().setTextAlign("justify").run()} className={editor.isActive({ textAlign: "justify" }) ? "bg-muted" : ""}>
+          <Button type="button" variant="ghost" size="sm" onClick={() => editor.chain().focus().setTextAlign("justify").run()} className={`h-8 w-8 p-0 ${editor.isActive({ textAlign: "justify" }) ? "bg-slate-200 text-slate-900" : "text-slate-600 hover:bg-slate-200/50 hover:text-slate-900"}`}>
             <AlignJustify className="h-4 w-4" />
           </Button>
 
-          <div className="mx-1 h-6 w-px bg-border" />
+          <div className="mx-1 h-6 w-px bg-slate-200" />
 
-          <Button type="button" variant="ghost" size="sm" onClick={setLink} className={editor.isActive("link") ? "bg-muted" : ""}>
+          <Button type="button" variant="ghost" size="sm" onClick={setLink} className={`h-8 w-8 p-0 ${editor.isActive("link") ? "bg-slate-200 text-slate-900" : "text-slate-600 hover:bg-slate-200/50 hover:text-slate-900"}`}>
             <Link2 className="h-4 w-4" />
           </Button>
-          <Button type="button" variant="ghost" size="sm" onClick={() => editor.chain().focus().extendMarkRange("link").unsetLink().run()} disabled={!editor.isActive("link")}>
+          <Button type="button" variant="ghost" size="sm" onClick={() => editor.chain().focus().extendMarkRange("link").unsetLink().run()} disabled={!editor.isActive("link")} className="h-8 w-8 p-0 text-slate-600 hover:bg-slate-200/50 hover:text-slate-900 disabled:opacity-50">
             <Unlink className="h-4 w-4" />
           </Button>
-          <Button type="button" variant="ghost" size="sm" onClick={insertImageByUrl}>
+          <Button type="button" variant="ghost" size="sm" onClick={insertImageByUrl} className="h-8 w-8 p-0 text-slate-600 hover:bg-slate-200/50 hover:text-slate-900">
             <ImageIcon className="h-4 w-4" />
           </Button>
-          <Button type="button" variant="ghost" size="sm" onClick={() => fileInputRef.current?.click()} disabled={isUploadingImage}>
+          <Button type="button" variant="ghost" size="sm" onClick={() => fileInputRef.current?.click()} disabled={isUploadingImage} className="h-8 w-8 p-0 text-slate-600 hover:bg-slate-200/50 hover:text-slate-900 disabled:opacity-50">
             {isUploadingImage ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
           </Button>
           <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={uploadImage} />
 
           {isEmailMode ? (
-            <div className="ml-auto flex items-center gap-2 rounded-md border bg-background px-2 py-1">
-              <Variable className="h-4 w-4 text-muted-foreground" />
+            <div className="ml-auto flex items-center gap-2 rounded-md border border-slate-200 bg-white px-2 py-1 shadow-sm">
+              <Variable className="h-4 w-4 text-slate-500" />
               <select
-                className="h-8 rounded-md border bg-background px-2 text-sm"
+                className="h-8 rounded-md border-none bg-transparent px-2 text-sm text-slate-700 focus:ring-0"
                 defaultValue=""
                 onChange={(event) => {
                   const token = event.target.value;
@@ -322,20 +322,20 @@ export function RichTextEditor({
             </div>
           ) : null}
 
-          <div className="mx-1 h-6 w-px bg-border" />
+          <div className="mx-1 h-6 w-px bg-slate-200" />
 
-          <Button type="button" variant="ghost" size="sm" onClick={() => editor.chain().focus().undo().run()} disabled={!editor.can().undo()}>
+          <Button type="button" variant="ghost" size="sm" onClick={() => editor.chain().focus().undo().run()} disabled={!editor.can().undo()} className="h-8 w-8 p-0 text-slate-600 hover:bg-slate-200/50 hover:text-slate-900 disabled:opacity-50">
             <Undo className="h-4 w-4" />
           </Button>
-          <Button type="button" variant="ghost" size="sm" onClick={() => editor.chain().focus().redo().run()} disabled={!editor.can().redo()}>
+          <Button type="button" variant="ghost" size="sm" onClick={() => editor.chain().focus().redo().run()} disabled={!editor.can().redo()} className="h-8 w-8 p-0 text-slate-600 hover:bg-slate-200/50 hover:text-slate-900 disabled:opacity-50">
             <Redo className="h-4 w-4" />
           </Button>
         </div>
 
         {editor.isActive("image") ? (
-          <div className="mt-2 flex flex-wrap items-center gap-2 rounded-md border bg-background px-2 py-2">
-            <span className="text-xs text-muted-foreground">Tamaño imagen</span>
-            <Button type="button" variant="outline" size="sm" className="h-8 px-2" onClick={() => applyImageWidthStep(-10)}>
+          <div className="mt-2 flex flex-wrap items-center gap-2 rounded-md border border-slate-200 bg-white px-2 py-2 shadow-sm">
+            <span className="text-xs font-medium text-slate-600">Tamaño imagen</span>
+            <Button type="button" variant="outline" size="sm" className="h-8 px-2 bg-white border-slate-200 text-slate-600 hover:bg-slate-50" onClick={() => applyImageWidthStep(-10)}>
               <Minus className="h-3.5 w-3.5" />
             </Button>
             <input
@@ -344,9 +344,9 @@ export function RichTextEditor({
               max={300}
               value={imageWidthPercent}
               onChange={(event) => applyImageWidth(Number(event.target.value))}
-              className="h-2 w-44 cursor-pointer"
+              className="h-2 w-44 cursor-pointer accent-blue-600"
             />
-            <Button type="button" variant="outline" size="sm" className="h-8 px-2" onClick={() => applyImageWidthStep(10)}>
+            <Button type="button" variant="outline" size="sm" className="h-8 px-2 bg-white border-slate-200 text-slate-600 hover:bg-slate-50" onClick={() => applyImageWidthStep(10)}>
               <Plus className="h-3.5 w-3.5" />
             </Button>
             <Input
@@ -359,12 +359,12 @@ export function RichTextEditor({
                 if (!Number.isFinite(rawValue)) return;
                 applyImageWidth(rawValue);
               }}
-              className="h-8 w-20"
+              className="h-8 w-20 bg-white border-slate-200"
             />
-            <span className="text-sm">%</span>
+            <span className="text-sm text-slate-500">%</span>
             <div className="ml-1 flex items-center gap-1">
               {[50, 75, 100].map((preset) => (
-                <Button key={preset} type="button" variant="secondary" size="sm" className="h-7 px-2 text-xs" onClick={() => applyImageWidth(preset)}>
+                <Button key={preset} type="button" variant="secondary" size="sm" className="h-7 px-2 text-xs bg-slate-100 text-slate-700 hover:bg-slate-200" onClick={() => applyImageWidth(preset)}>
                   {preset}%
                 </Button>
               ))}
@@ -373,7 +373,7 @@ export function RichTextEditor({
         ) : null}
       </div>
 
-      <EditorContent editor={editor} />
+      <EditorContent editor={editor} className="prose prose-slate max-w-none p-4 min-h-[300px] focus:outline-none" />
     </div>
   );
 }

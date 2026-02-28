@@ -14,22 +14,26 @@ export function AdminStats({ stats }: { stats: { dailySales: any, dailyExpenses:
 
     return (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-            <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">Ventas Hoy</CardTitle>
-                    <DollarSign className="h-4 w-4 text-muted-foreground" />
+            <Card className="border-slate-200 shadow-sm bg-white overflow-hidden">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 border-b border-slate-100 bg-slate-50/50">
+                    <CardTitle className="text-sm font-medium text-slate-600">Ventas Hoy</CardTitle>
+                    <div className="rounded-full bg-emerald-100 p-2">
+                        <DollarSign className="h-4 w-4 text-emerald-600" />
+                    </div>
                 </CardHeader>
-                <CardContent>
-                    <div className="text-2xl font-bold">{formatMoney(stats.dailySales)}</div>
+                <CardContent className="pt-6">
+                    <div className="text-3xl font-bold text-slate-900">{formatMoney(stats.dailySales)}</div>
                 </CardContent>
             </Card>
-             <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">Gastos Hoy</CardTitle>
-                    <CreditCard className="h-4 w-4 text-muted-foreground" />
+             <Card className="border-slate-200 shadow-sm bg-white overflow-hidden">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 border-b border-slate-100 bg-slate-50/50">
+                    <CardTitle className="text-sm font-medium text-slate-600">Gastos Hoy</CardTitle>
+                    <div className="rounded-full bg-rose-100 p-2">
+                        <CreditCard className="h-4 w-4 text-rose-600" />
+                    </div>
                 </CardHeader>
-                <CardContent>
-                    <div className="text-2xl font-bold">{formatMoney(stats.dailyExpenses)}</div>
+                <CardContent className="pt-6">
+                    <div className="text-3xl font-bold text-slate-900">{formatMoney(stats.dailyExpenses)}</div>
                 </CardContent>
             </Card>
              {/* Agrega mas stats si quieres */}

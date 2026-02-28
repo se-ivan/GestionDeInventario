@@ -212,45 +212,45 @@ export function FinancialReports({ initialData, initialFilters }: FinancialRepor
   const marginKpi = Math.max(0, Math.min(100, data.charts.marginKpi))
 
   return (
-    <div className="space-y-4">
-      <Card className="border-none shadow-md bg-white/50 backdrop-blur-sm">
-        <CardHeader className="pb-3">
-          <CardTitle className="flex items-center gap-2 text-base font-semibold text-slate-700">
-            <Filter className="h-4 w-4" />
+    <div className="space-y-6">
+      <Card className="border-slate-200 shadow-sm bg-white overflow-hidden">
+        <CardHeader className="border-b border-slate-100 bg-slate-50/50 pb-4">
+          <CardTitle className="flex items-center gap-2 text-lg font-semibold text-slate-800">
+            <Filter className="h-5 w-5 text-blue-600" />
             Filtros financieros
           </CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <CardContent className="space-y-6 p-6">
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
             <div className="space-y-2">
-              <label className="text-sm font-medium text-slate-600">Fecha de inicio</label>
+              <label className="text-sm font-medium text-slate-700">Fecha de inicio</label>
               <Input 
                 type="date" 
                 value={startDate} 
                 onChange={(event) => setStartDate(event.target.value)} 
-                className="bg-white/50 border-slate-200"
+                className="bg-white border-slate-200 focus:border-blue-500 focus:ring-blue-500/20"
               />
             </div>
             <div className="space-y-2">
-              <label className="text-sm font-medium text-slate-600">Fecha de fin</label>
+              <label className="text-sm font-medium text-slate-700">Fecha de fin</label>
               <Input 
                 type="date" 
                 value={endDate} 
                 onChange={(event) => setEndDate(event.target.value)} 
-                className="bg-white/50 border-slate-200"
+                className="bg-white border-slate-200 focus:border-blue-500 focus:ring-blue-500/20"
               />
             </div>
             <div className="space-y-2 lg:col-span-2">
-              <label className="text-sm font-medium text-slate-600">Tipo de operación</label>
-              <div className="flex flex-wrap gap-3 rounded-md bg-muted/40 p-3">
+              <label className="text-sm font-medium text-slate-700">Tipo de operación</label>
+              <div className="flex flex-wrap gap-4 rounded-lg border border-slate-200 bg-slate-50/50 p-3">
                 {OPERATION_OPTIONS.map((option) => (
-                  <label key={option.value} className="flex items-center gap-2 text-sm cursor-pointer">
+                  <label key={option.value} className="flex items-center gap-2 text-sm cursor-pointer text-slate-700 hover:text-slate-900 transition-colors">
                     <Checkbox
                       checked={operationTypes.includes(option.value)}
                       onCheckedChange={() =>
                         setOperationTypes((prev) => toggleValue(prev, option.value, ["VENTAS", "GASTOS"]))
                       }
-                      className="border-slate-300 data-[state=checked]:bg-primary data-[state=checked]:border-primary"
+                      className="border-slate-300 data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600"
                     />
                     {option.label}
                   </label>
@@ -259,12 +259,12 @@ export function FinancialReports({ initialData, initialFilters }: FinancialRepor
             </div>
           </div>
 
-          <div className="grid gap-4 lg:grid-cols-2">
+          <div className="grid gap-6 lg:grid-cols-2">
             <div className="space-y-2">
-              <label className="text-sm font-medium text-slate-600">Categorías de venta</label>
-              <div className="flex flex-wrap gap-3 rounded-md bg-muted/40 p-3">
+              <label className="text-sm font-medium text-slate-700">Categorías de venta</label>
+              <div className="flex flex-wrap gap-4 rounded-lg border border-slate-200 bg-slate-50/50 p-3 min-h-[52px]">
                 {SALE_CATEGORY_OPTIONS.map((option) => (
-                  <label key={option.value} className="flex items-center gap-2 text-sm cursor-pointer">
+                  <label key={option.value} className={`flex items-center gap-2 text-sm cursor-pointer transition-colors ${!operationTypes.includes("VENTAS") ? "opacity-50 cursor-not-allowed" : "text-slate-700 hover:text-slate-900"}`}>
                     <Checkbox
                       checked={saleCategories.includes(option.value)}
                       disabled={!operationTypes.includes("VENTAS")}
@@ -273,7 +273,7 @@ export function FinancialReports({ initialData, initialFilters }: FinancialRepor
                           toggleValue(prev, option.value, ["LIBROS", "DULCERIA", "CONSIGNACION"])
                         )
                       }
-                      className="border-slate-300 data-[state=checked]:bg-primary data-[state=checked]:border-primary"
+                      className="border-slate-300 data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600"
                     />
                     {option.label}
                   </label>
@@ -282,8 +282,8 @@ export function FinancialReports({ initialData, initialFilters }: FinancialRepor
             </div>
 
             <div className="space-y-2">
-              <label className="text-sm font-medium text-slate-600">Categorías de gasto</label>
-              <div className="flex flex-wrap gap-2 rounded-md bg-muted/40 p-3">
+              <label className="text-sm font-medium text-slate-700">Categorías de gasto</label>
+              <div className="flex flex-wrap gap-2 rounded-lg border border-slate-200 bg-slate-50/50 p-2 min-h-[52px]">
                 {data.availableExpenseCategories.map((category) => {
                   const checked = expenseCategories.includes(category)
                   return (
@@ -291,7 +291,7 @@ export function FinancialReports({ initialData, initialFilters }: FinancialRepor
                       key={category}
                       size="sm"
                       variant={checked ? "secondary" : "ghost"}
-                      className={checked ? "bg-white text-primary shadow-sm" : "hover:bg-white/50"}
+                      className={checked ? "bg-white text-blue-700 shadow-sm border border-slate-200" : "text-slate-600 hover:bg-slate-200/50 hover:text-slate-900"}
                       disabled={!operationTypes.includes("GASTOS")}
                       onClick={() => {
                         setExpenseCategories((prev) => {
@@ -306,7 +306,7 @@ export function FinancialReports({ initialData, initialFilters }: FinancialRepor
                     </Button>
                   )
                 })}
-                <Button size="sm" variant="ghost" onClick={() => setExpenseCategories([])} className="hover:bg-white/50">
+                <Button size="sm" variant="ghost" onClick={() => setExpenseCategories([])} className="text-slate-600 hover:bg-slate-200/50 hover:text-slate-900">
                   Todas
                 </Button>
               </div>
@@ -315,65 +315,65 @@ export function FinancialReports({ initialData, initialFilters }: FinancialRepor
         </CardContent>
       </Card>
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-        <Card className="border-none shadow-md bg-white/50 backdrop-blur-sm">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-slate-500">Total de ventas</CardTitle>
+      <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-3">
+        <Card className="border-slate-200 shadow-sm bg-white overflow-hidden">
+          <CardHeader className="pb-2 border-b border-slate-100 bg-slate-50/50">
+            <CardTitle className="text-sm font-medium text-slate-600">Total de ventas</CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-slate-800">{formatCurrency(data.summary.totalVentas)}</div>
+          <CardContent className="pt-6">
+            <div className="text-3xl font-bold text-slate-900">{formatCurrency(data.summary.totalVentas)}</div>
           </CardContent>
         </Card>
-        <Card className="border-none shadow-md bg-white/50 backdrop-blur-sm">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-slate-500">Total de gastos</CardTitle>
+        <Card className="border-slate-200 shadow-sm bg-white overflow-hidden">
+          <CardHeader className="pb-2 border-b border-slate-100 bg-slate-50/50">
+            <CardTitle className="text-sm font-medium text-slate-600">Total de gastos</CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-slate-800">{formatCurrency(data.summary.totalGastos)}</div>
+          <CardContent className="pt-6">
+            <div className="text-3xl font-bold text-slate-900">{formatCurrency(data.summary.totalGastos)}</div>
           </CardContent>
         </Card>
-        <Card className="border-none shadow-md bg-white/50 backdrop-blur-sm">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-slate-500">Ganancia bruta</CardTitle>
+        <Card className="border-slate-200 shadow-sm bg-white overflow-hidden">
+          <CardHeader className="pb-2 border-b border-slate-100 bg-slate-50/50">
+            <CardTitle className="text-sm font-medium text-slate-600">Ganancia bruta</CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-slate-800">{formatCurrency(data.summary.gananciaBruta)}</div>
+          <CardContent className="pt-6">
+            <div className="text-3xl font-bold text-slate-900">{formatCurrency(data.summary.gananciaBruta)}</div>
           </CardContent>
         </Card>
-        <Card className="border-none shadow-md bg-white/50 backdrop-blur-sm">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-slate-500">Margen promedio</CardTitle>
+        <Card className="border-slate-200 shadow-sm bg-white overflow-hidden">
+          <CardHeader className="pb-2 border-b border-slate-100 bg-slate-50/50">
+            <CardTitle className="text-sm font-medium text-slate-600">Margen promedio</CardTitle>
           </CardHeader>
-          <CardContent>
-             <div className="text-2xl font-bold text-slate-800">{data.summary.margenPromedio.toFixed(2)}%</div>
+          <CardContent className="pt-6">
+             <div className="text-3xl font-bold text-slate-900">{data.summary.margenPromedio.toFixed(2)}%</div>
           </CardContent>
         </Card>
-        <Card className="border-none shadow-md bg-white/50 backdrop-blur-sm">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-slate-500">Producto más vendido</CardTitle>
+        <Card className="border-slate-200 shadow-sm bg-white overflow-hidden">
+          <CardHeader className="pb-2 border-b border-slate-100 bg-slate-50/50">
+            <CardTitle className="text-sm font-medium text-slate-600">Producto más vendido</CardTitle>
           </CardHeader>
-          <CardContent>
-             <div className="text-sm font-medium text-slate-800 truncate" title={data.summary.productoMasVendido}>
+          <CardContent className="pt-6">
+             <div className="text-lg font-medium text-slate-900 truncate" title={data.summary.productoMasVendido}>
               {data.summary.productoMasVendido || "N/A"}
              </div>
           </CardContent>
         </Card>
-        <Card className="border-none shadow-md bg-white/50 backdrop-blur-sm">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-slate-500">Categoría más rentable</CardTitle>
+        <Card className="border-slate-200 shadow-sm bg-white overflow-hidden">
+          <CardHeader className="pb-2 border-b border-slate-100 bg-slate-50/50">
+            <CardTitle className="text-sm font-medium text-slate-600">Categoría más rentable</CardTitle>
           </CardHeader>
-          <CardContent>
-             <div className="text-sm font-medium text-slate-800 truncate">{data.summary.categoriaMasRentable || "N/A"}</div>
+          <CardContent className="pt-6">
+             <div className="text-lg font-medium text-slate-900 truncate">{data.summary.categoriaMasRentable || "N/A"}</div>
           </CardContent>
         </Card>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-2">
-        <Card className="border-none shadow-md bg-white/50 backdrop-blur-sm">
-          <CardHeader>
-            <CardTitle className="text-base font-semibold text-slate-700">Evolución de ventas</CardTitle>
+      <div className="grid gap-6 lg:grid-cols-2">
+        <Card className="border-slate-200 shadow-sm bg-white overflow-hidden">
+          <CardHeader className="border-b border-slate-100 bg-slate-50/50 pb-4">
+            <CardTitle className="text-lg font-semibold text-slate-800">Evolución de ventas</CardTitle>
           </CardHeader>
-          <CardContent className="h-[320px] w-full min-w-0">
+          <CardContent className="h-[320px] w-full min-w-0 p-6">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={data.charts.lineSalesOverTime} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
@@ -403,9 +403,9 @@ export function FinancialReports({ initialData, initialFilters }: FinancialRepor
                 <Line 
                   type="monotone" 
                   dataKey="ventas" 
-                  stroke="var(--primary)" 
+                  stroke="#2563eb" 
                   strokeWidth={3} 
-                  dot={{ r: 4, fill: "var(--primary)", strokeWidth: 0 }}
+                  dot={{ r: 4, fill: "#2563eb", strokeWidth: 0 }}
                   activeDot={{ r: 6, strokeWidth: 0 }}
                 />
               </LineChart>
@@ -413,11 +413,11 @@ export function FinancialReports({ initialData, initialFilters }: FinancialRepor
           </CardContent>
         </Card>
 
-        <Card className="border-none shadow-md bg-white/50 backdrop-blur-sm">
-          <CardHeader>
-            <CardTitle className="text-base font-semibold text-slate-700">Comparación por categoría</CardTitle>
+        <Card className="border-slate-200 shadow-sm bg-white overflow-hidden">
+          <CardHeader className="border-b border-slate-100 bg-slate-50/50 pb-4">
+            <CardTitle className="text-lg font-semibold text-slate-800">Comparación por categoría</CardTitle>
           </CardHeader>
-          <CardContent className="h-[320px] w-full min-w-0">
+          <CardContent className="h-[320px] w-full min-w-0 p-6">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={data.charts.barByCategory} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
@@ -448,7 +448,7 @@ export function FinancialReports({ initialData, initialFilters }: FinancialRepor
                 <Bar 
                   dataKey="value" 
                   name="Valor neto" 
-                  fill="var(--primary)" 
+                  fill="#2563eb" 
                   radius={[4, 4, 0, 0]} 
                   maxBarSize={60}
                 />
@@ -457,11 +457,11 @@ export function FinancialReports({ initialData, initialFilters }: FinancialRepor
           </CardContent>
         </Card>
 
-        <Card className="border-none shadow-md bg-white/50 backdrop-blur-sm">
-          <CardHeader>
-            <CardTitle className="text-base font-semibold text-slate-700">Distribución de ingresos</CardTitle>
+        <Card className="border-slate-200 shadow-sm bg-white overflow-hidden">
+          <CardHeader className="border-b border-slate-100 bg-slate-50/50 pb-4">
+            <CardTitle className="text-lg font-semibold text-slate-800">Distribución de ingresos</CardTitle>
           </CardHeader>
-          <CardContent className="h-[320px] w-full min-w-0">
+          <CardContent className="h-[320px] w-full min-w-0 p-6">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <Pie
@@ -493,31 +493,31 @@ export function FinancialReports({ initialData, initialFilters }: FinancialRepor
           </CardContent>
         </Card>
 
-        <Card className="border-none shadow-md bg-white/50 backdrop-blur-sm">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base font-semibold text-slate-700">
-              <TrendingUp className="h-4 w-4 text-emerald-500" />
+        <Card className="border-slate-200 shadow-sm bg-white overflow-hidden">
+          <CardHeader className="border-b border-slate-100 bg-slate-50/50 pb-4">
+            <CardTitle className="flex items-center gap-2 text-lg font-semibold text-slate-800">
+              <TrendingUp className="h-5 w-5 text-emerald-600" />
               KPI de margen
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="space-y-4 p-6">
             <div className="text-3xl font-bold text-slate-800">{data.charts.marginKpi.toFixed(2)}%</div>
-            <div className="h-3 w-full overflow-hidden rounded-full bg-slate-200">
+            <div className="h-3 w-full overflow-hidden rounded-full bg-slate-100">
               <div
                 className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-teal-400 transition-all"
                 style={{ width: `${marginKpi}%` }}
               />
             </div>
-            <Badge variant="outline" className="bg-white border-slate-200 text-slate-600">Utilidad sobre ventas considerando costo unitario</Badge>
+            <Badge variant="outline" className="bg-slate-50 border-slate-200 text-slate-600 font-medium">Utilidad sobre ventas considerando costo unitario</Badge>
           </CardContent>
         </Card>
       </div>
 
-      <Card className="border-none shadow-md bg-white/50 backdrop-blur-sm">
-        <CardHeader className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-          <CardTitle className="text-base font-semibold text-slate-700">Detalle de operaciones</CardTitle>
+      <Card className="border-slate-200 shadow-sm bg-white overflow-hidden">
+        <CardHeader className="border-b border-slate-100 bg-slate-50/50 pb-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <CardTitle className="text-lg font-semibold text-slate-800">Detalle de operaciones</CardTitle>
           <div className="flex flex-wrap items-center gap-2">
-            <Button variant="outline" onClick={handleExportCsv} disabled={isPending} className="bg-white hover:bg-slate-50 border-slate-200">
+            <Button variant="outline" onClick={handleExportCsv} disabled={isPending} className="bg-white hover:bg-slate-50 border-slate-200 text-slate-700">
               <Download className="mr-2 h-4 w-4" /> Exportar CSV
             </Button>
             <Input
@@ -529,57 +529,57 @@ export function FinancialReports({ initialData, initialFilters }: FinancialRepor
                 const value = Number(event.target.value) || 15
                 loadData(1, sortField, sortOrder, Math.max(5, Math.min(100, value)))
               }}
-              className="w-24 bg-white border-slate-200"
+              className="w-24 bg-white border-slate-200 focus-visible:ring-blue-500"
             />
           </div>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="rounded-md border border-slate-200 bg-white shadow-sm overflow-hidden">
+        <CardContent className="p-0">
+          <div className="overflow-x-auto">
             <Table>
-              <TableHeader className="bg-slate-50">
-                <TableRow className="border-slate-200 hover:bg-slate-50">
-                  <TableHead>
-                    <Button variant="ghost" size="sm" onClick={() => handleSort("fecha")} className="hover:bg-slate-200/50 hover:text-slate-900 font-semibold text-slate-600">
+              <TableHeader className="bg-slate-50/80 border-b border-slate-200">
+                <TableRow className="hover:bg-transparent">
+                  <TableHead className="h-12 px-4">
+                    <Button variant="ghost" size="sm" onClick={() => handleSort("fecha")} className="hover:bg-slate-200/50 hover:text-slate-900 font-semibold text-slate-700 -ml-3 h-8">
                       Fecha <SortIcon field="fecha" />
                     </Button>
                   </TableHead>
-                  <TableHead>
-                    <Button variant="ghost" size="sm" onClick={() => handleSort("producto")} className="hover:bg-slate-200/50 hover:text-slate-900 font-semibold text-slate-600">
+                  <TableHead className="h-12 px-4">
+                    <Button variant="ghost" size="sm" onClick={() => handleSort("producto")} className="hover:bg-slate-200/50 hover:text-slate-900 font-semibold text-slate-700 -ml-3 h-8">
                       Producto <SortIcon field="producto" />
                     </Button>
                   </TableHead>
-                  <TableHead>
-                    <Button variant="ghost" size="sm" onClick={() => handleSort("categoria")} className="hover:bg-slate-200/50 hover:text-slate-900 font-semibold text-slate-600">
+                  <TableHead className="h-12 px-4">
+                    <Button variant="ghost" size="sm" onClick={() => handleSort("categoria")} className="hover:bg-slate-200/50 hover:text-slate-900 font-semibold text-slate-700 -ml-3 h-8">
                       Categoría <SortIcon field="categoria" />
                     </Button>
                   </TableHead>
-                  <TableHead className="text-right">
-                    <Button variant="ghost" size="sm" onClick={() => handleSort("cantidad")} className="hover:bg-slate-200/50 hover:text-slate-900 font-semibold text-slate-600">
+                  <TableHead className="h-12 px-4 text-right">
+                    <Button variant="ghost" size="sm" onClick={() => handleSort("cantidad")} className="hover:bg-slate-200/50 hover:text-slate-900 font-semibold text-slate-700 -mr-3 h-8 justify-end w-full">
                       Cantidad <SortIcon field="cantidad" />
                     </Button>
                   </TableHead>
-                  <TableHead className="text-right">
-                    <Button variant="ghost" size="sm" onClick={() => handleSort("precioUnitario")} className="hover:bg-slate-200/50 hover:text-slate-900 font-semibold text-slate-600">
+                  <TableHead className="h-12 px-4 text-right">
+                    <Button variant="ghost" size="sm" onClick={() => handleSort("precioUnitario")} className="hover:bg-slate-200/50 hover:text-slate-900 font-semibold text-slate-700 -mr-3 h-8 justify-end w-full">
                       Precio unitario <SortIcon field="precioUnitario" />
                     </Button>
                   </TableHead>
-                  <TableHead className="text-right">
-                    <Button variant="ghost" size="sm" onClick={() => handleSort("costoUnitario")} className="hover:bg-slate-200/50 hover:text-slate-900 font-semibold text-slate-600">
+                  <TableHead className="h-12 px-4 text-right">
+                    <Button variant="ghost" size="sm" onClick={() => handleSort("costoUnitario")} className="hover:bg-slate-200/50 hover:text-slate-900 font-semibold text-slate-700 -mr-3 h-8 justify-end w-full">
                       Costo unitario <SortIcon field="costoUnitario" />
                     </Button>
                   </TableHead>
-                  <TableHead className="text-right">
-                    <Button variant="ghost" size="sm" onClick={() => handleSort("totalVenta")} className="hover:bg-slate-200/50 hover:text-slate-900 font-semibold text-slate-600">
+                  <TableHead className="h-12 px-4 text-right">
+                    <Button variant="ghost" size="sm" onClick={() => handleSort("totalVenta")} className="hover:bg-slate-200/50 hover:text-slate-900 font-semibold text-slate-700 -mr-3 h-8 justify-end w-full">
                       Total venta <SortIcon field="totalVenta" />
                     </Button>
                   </TableHead>
-                  <TableHead className="text-right">
-                    <Button variant="ghost" size="sm" onClick={() => handleSort("margen")} className="hover:bg-slate-200/50 hover:text-slate-900 font-semibold text-slate-600">
+                  <TableHead className="h-12 px-4 text-right">
+                    <Button variant="ghost" size="sm" onClick={() => handleSort("margen")} className="hover:bg-slate-200/50 hover:text-slate-900 font-semibold text-slate-700 -mr-3 h-8 justify-end w-full">
                       Margen <SortIcon field="margen" />
                     </Button>
                   </TableHead>
-                  <TableHead>
-                    <Button variant="ghost" size="sm" onClick={() => handleSort("tipoOperacion")} className="hover:bg-slate-200/50 hover:text-slate-900 font-semibold text-slate-600">
+                  <TableHead className="h-12 px-4">
+                    <Button variant="ghost" size="sm" onClick={() => handleSort("tipoOperacion")} className="hover:bg-slate-200/50 hover:text-slate-900 font-semibold text-slate-700 -ml-3 h-8">
                       Tipo operación <SortIcon field="tipoOperacion" />
                     </Button>
                   </TableHead>
@@ -588,23 +588,27 @@ export function FinancialReports({ initialData, initialFilters }: FinancialRepor
               <TableBody>
                 {data.rows.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={9} className="py-8 text-center text-muted-foreground">
+                    <TableCell colSpan={9} className="h-32 text-center text-slate-500">
                       No hay registros para los filtros seleccionados.
                     </TableCell>
                   </TableRow>
                 ) : (
                   data.rows.map((row) => (
-                    <TableRow key={row.id} className="border-slate-100 hover:bg-slate-50/50">
-                      <TableCell className="font-medium text-slate-700">{formatDateCell(row.fecha)}</TableCell>
-                      <TableCell className="max-w-[220px] truncate text-slate-600" title={row.producto}>{row.producto}</TableCell>
-                      <TableCell className="text-slate-600">{row.categoria}</TableCell>
-                      <TableCell className="text-right text-slate-600">{row.cantidad}</TableCell>
-                      <TableCell className="text-right text-slate-600">{formatCurrency(row.precioUnitario)}</TableCell>
-                      <TableCell className="text-right text-slate-600">{formatCurrency(row.costoUnitario)}</TableCell>
-                      <TableCell className="text-right font-medium text-slate-700">{formatCurrency(row.totalVenta)}</TableCell>
-                      <TableCell className="text-right font-medium text-slate-700">{formatCurrency(row.margen)}</TableCell>
-                      <TableCell>
-                        <Badge variant={row.tipoOperacion === "VENTA" ? "default" : "secondary"} className={row.tipoOperacion === "VENTA" ? "bg-emerald-500 hover:bg-emerald-600" : "bg-slate-500 hover:bg-slate-600"}>
+                    <TableRow key={row.id} className="border-b border-slate-100 hover:bg-slate-50/80 transition-colors">
+                      <TableCell className="px-4 py-3 font-medium text-slate-700">{formatDateCell(row.fecha)}</TableCell>
+                      <TableCell className="px-4 py-3 max-w-[220px] truncate text-slate-600" title={row.producto}>{row.producto}</TableCell>
+                      <TableCell className="px-4 py-3 text-slate-600">
+                        <Badge variant="secondary" className="bg-slate-100 text-slate-700 hover:bg-slate-200 font-normal">
+                          {row.categoria}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="px-4 py-3 text-right text-slate-600">{row.cantidad}</TableCell>
+                      <TableCell className="px-4 py-3 text-right text-slate-600">{formatCurrency(row.precioUnitario)}</TableCell>
+                      <TableCell className="px-4 py-3 text-right text-slate-600">{formatCurrency(row.costoUnitario)}</TableCell>
+                      <TableCell className="px-4 py-3 text-right font-medium text-slate-700">{formatCurrency(row.totalVenta)}</TableCell>
+                      <TableCell className="px-4 py-3 text-right font-medium text-slate-700">{formatCurrency(row.margen)}</TableCell>
+                      <TableCell className="px-4 py-3">
+                        <Badge variant={row.tipoOperacion === "VENTA" ? "default" : "secondary"} className={row.tipoOperacion === "VENTA" ? "bg-emerald-100 text-emerald-700 hover:bg-emerald-200 border-emerald-200" : "bg-slate-100 text-slate-700 hover:bg-slate-200 border-slate-200"}>
                           {row.tipoOperacion}
                         </Badge>
                       </TableCell>
@@ -615,15 +619,15 @@ export function FinancialReports({ initialData, initialFilters }: FinancialRepor
             </Table>
           </div>
 
-          <div className="flex flex-col gap-3 text-sm md:flex-row md:items-center md:justify-between px-1">
+          <div className="flex flex-col gap-3 text-sm md:flex-row md:items-center md:justify-between p-4 bg-slate-50/50 border-t border-slate-100">
             <div className="text-slate-500 font-medium">
               Mostrando {(page - 1) * data.pageSize + 1} - {Math.min(page * data.pageSize, data.totalRows)} de {data.totalRows}
             </div>
             <div className="flex items-center gap-2">
-              <Button variant="outline" size="sm" disabled={page <= 1 || isPending} onClick={() => loadData(page - 1, sortField, sortOrder)} className="bg-white hover:bg-slate-50">
+              <Button variant="outline" size="sm" disabled={page <= 1 || isPending} onClick={() => loadData(page - 1, sortField, sortOrder)} className="bg-white hover:bg-slate-50 border-slate-200 text-slate-600">
                 Anterior
               </Button>
-              <span className="text-slate-600 font-medium">
+              <span className="text-slate-600 font-medium px-2">
                 Página {page} de {totalPages}
               </span>
               <Button
@@ -631,7 +635,7 @@ export function FinancialReports({ initialData, initialFilters }: FinancialRepor
                 size="sm"
                 disabled={page >= totalPages || isPending}
                 onClick={() => loadData(page + 1, sortField, sortOrder)}
-                className="bg-white hover:bg-slate-50"
+                className="bg-white hover:bg-slate-50 border-slate-200 text-slate-600"
               >
                 Siguiente
               </Button>

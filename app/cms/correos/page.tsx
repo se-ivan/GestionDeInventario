@@ -13,7 +13,7 @@ export default async function CmsCorreosPage() {
   }
 
   return (
-    <div className="flex-1 space-y-4 p-8 pt-6">
+    <div className="flex-1 p-8 pt-6 bg-slate-50/30 min-h-screen">
       <CmsSectionsTabs />
       <EmailCampaignManager />
     </div>
